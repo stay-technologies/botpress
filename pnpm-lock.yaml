@@ -1818,6 +1818,46 @@ importers:
         specifier: ^2.39.1
         version: 2.39.1
 
+  integrations/whatsapp-stay:
+    dependencies:
+      '@botpress/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@botpress/sdk':
+        specifier: workspace:*
+        version: link:../../packages/sdk
+      '@botpress/sdk-addons':
+        specifier: workspace:*
+        version: link:../../packages/sdk-addons
+      '@segment/analytics-node':
+        specifier: ^2.2.0
+        version: 2.2.0
+      axios:
+        specifier: ^1.6.2
+        version: 1.12.2
+      marked:
+        specifier: ^15.0.1
+        version: 15.0.1
+      preact:
+        specifier: ^10.26.6
+        version: 10.26.6
+      preact-render-to-string:
+        specifier: ^6.5.13
+        version: 6.5.13(preact@10.26.6)
+      whatsapp-api-js:
+        specifier: ^5.3.0
+        version: 5.3.0
+    devDependencies:
+      '@botpress/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
+      '@botpress/common':
+        specifier: workspace:*
+        version: link:../../packages/common
+      '@sentry/cli':
+        specifier: ^2.39.1
+        version: 2.39.1
+
   integrations/zapier:
     dependencies:
       '@botpress/client':
@@ -12640,8 +12680,8 @@ snapshots:
 
   '@doist/todoist-api-typescript@3.0.3(type-fest@4.41.0)':
     dependencies:
-      axios: 1.11.0
-      axios-case-converter: 1.1.1(axios@1.11.0)
+      axios: 1.12.2
+      axios-case-converter: 1.1.1(axios@1.12.2)
       axios-retry: 3.9.1
       runtypes: 6.7.0
       ts-custom-error: 3.3.1
@@ -14719,7 +14759,7 @@ snapshots:
 
   '@types/axios@0.14.4':
     dependencies:
-      axios: 1.11.0
+      axios: 1.12.2
     transitivePeerDependencies:
       - debug
 
@@ -15426,9 +15466,9 @@ snapshots:
 
   aws4@1.12.0: {}
 
-  axios-case-converter@1.1.1(axios@1.11.0):
+  axios-case-converter@1.1.1(axios@1.12.2):
     dependencies:
-      axios: 1.11.0
+      axios: 1.12.2
       camel-case: 4.1.2
       header-case: 2.0.4
       snake-case: 3.0.4
@@ -20669,7 +20709,7 @@ snapshots:
 
   trello.js@1.2.7:
     dependencies:
-      axios: 1.11.0
+      axios: 1.12.2
       form-data: 4.0.0
       tslib: 2.6.2
     transitivePeerDependencies:
