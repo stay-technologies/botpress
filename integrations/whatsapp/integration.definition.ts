@@ -560,6 +560,11 @@ export default new IntegrationDefinition({
             }),
         }),
       },
+      output: {
+        schema: z.object({
+          conversationId: z.string().title('Conversation ID').describe('ID of the conversation used/created'),
+        }),
+      },
     },
   },
   events: {
