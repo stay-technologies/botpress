@@ -99,6 +99,8 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
 
   const response = await whatsapp.sendMessage(botPhoneNumberId, userPhone, interactive)
 
+  logger.forBot().info(`WhatsApp sendMessage response for flow: ${JSON.stringify(response)}`)
+
   if ('error' in response) {
     const errorJSON = JSON.stringify(response.error)
     _logForBotAndThrow(
@@ -116,6 +118,21 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
         flow.flowName ?? ''
       }" and action "${parameters.flow_action}"`
     )
+
+  await client
+    .createMessage({
+      origin: 'synthetic',
+      conversationId: conversation.id,
+      userId: ctx.botId,
+      tags: {},
+      type: 'text',
+      payload: {
+        text: `[Flow] ${flow.flowName ?? flow.flowId ?? 'unknown'} - ${bodyText}`,
+      },
+    })
+    .catch((err: any) => {
+      logger.forBot().error(`Failed to create synthetic message for flow - Error: ${err?.message ?? ''}`)
+    })
 
   return {
     conversationId: conversation.id,
