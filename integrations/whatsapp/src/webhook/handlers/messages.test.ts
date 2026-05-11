@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest'
-import { _handleMessage, HandleMessageArgs } from './messages'
+import { _handleMessage, _isFlowMessage, HandleMessageArgs } from './messages'
 import { WhatsAppMessage } from '../../misc/types'
 
 const baseMessageFields = {
@@ -107,6 +107,53 @@ describe('_handleMessage interactive', () => {
       payload: { value: 'item-1', text: 'Option 1' },
       incomingMessageType: 'interactive',
     })
+  })
+})
+
+describe('_isFlowMessage', () => {
+  test('true para nfm_reply com name="flow"', () => {
+    const message: WhatsAppMessage = {
+      ...baseMessageFields,
+      type: 'interactive',
+      interactive: {
+        type: 'nfm_reply',
+        nfm_reply: { response_json: '{}', body: '', name: 'flow' },
+      },
+    }
+    expect(_isFlowMessage(message)).toBe(true)
+  })
+
+  test('false para nfm_reply com name diferente de "flow"', () => {
+    const message: WhatsAppMessage = {
+      ...baseMessageFields,
+      type: 'interactive',
+      interactive: {
+        type: 'nfm_reply',
+        nfm_reply: { response_json: '{}', body: '', name: 'other' },
+      },
+    }
+    expect(_isFlowMessage(message)).toBe(false)
+  })
+
+  test('false para button_reply', () => {
+    const message: WhatsAppMessage = {
+      ...baseMessageFields,
+      type: 'interactive',
+      interactive: {
+        type: 'button_reply',
+        button_reply: { id: 'a', title: 'A' },
+      },
+    }
+    expect(_isFlowMessage(message)).toBe(false)
+  })
+
+  test('false para mensagem de texto', () => {
+    const message: WhatsAppMessage = {
+      ...baseMessageFields,
+      type: 'text',
+      text: { body: 'oi' },
+    }
+    expect(_isFlowMessage(message)).toBe(false)
   })
 })
 

@@ -84,10 +84,7 @@ export const messagesHandler = async (
     discriminateByTags: ['userId'],
   })
 
-  const isFlowMessage =
-    message.type === 'interactive' &&
-    message.interactive.type === 'nfm_reply' &&
-    message.interactive.nfm_reply.name === 'flow'
+  const isFlowMessage = _isFlowMessage(message)
   const replyToWhatsAppId = message.context?.id
   const replyToMessage = replyToWhatsAppId
     ? await getMessageFromWhatsappMessageId(replyToWhatsAppId, client)
@@ -269,6 +266,14 @@ function _getMediaExpiry(ctx: bp.Context) {
   }
   const expiresAt = new Date(Date.now() + expiryDelayHours * 60 * 60 * 1000)
   return expiresAt.toISOString()
+}
+
+export function _isFlowMessage(message: WhatsAppMessage): boolean {
+  return (
+    message.type === 'interactive' &&
+    message.interactive.type === 'nfm_reply' &&
+    message.interactive.nfm_reply.name === 'flow'
+  )
 }
 
 function _processReferralTags(message: WhatsAppMessage, logger: bp.Logger): Record<string, string> {
