@@ -553,10 +553,6 @@ export default new IntegrationDefinition({
                 .optional()
                 .title('Initial Data JSON')
                 .describe('Non-empty JSON object passed to the first screen when navigating'),
-            })
-            .refine((v) => !!v.flowId || !!v.flowName, {
-              message: 'Provide either Flow ID or Flow Name',
-              path: ['flowId'],
             }),
         }),
       },
