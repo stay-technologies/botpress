@@ -156,8 +156,8 @@ const defaultBotPhoneNumberId = {
   description: 'Default Phone ID used by the bot for starting conversations',
 }
 
-export const INTEGRATION_NAME = 'whatsapp'
-export const INTEGRATION_VERSION = '4.15.0'
+export const INTEGRATION_NAME = 'whatsapp-stay'
+export const INTEGRATION_VERSION = '1.0.8'
 export default new IntegrationDefinition({
   name: INTEGRATION_NAME,
   version: INTEGRATION_VERSION,
