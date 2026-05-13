@@ -1,14 +1,19 @@
 import { z } from '@botpress/sdk'
 import { qualityScoreSchema } from 'definitions/events'
 
-const WhatsAppContactSchema = z.object({
-  wa_id: z.string(),
-  profile: z
-    .object({
-      name: z.string().optional(),
-    })
-    .optional(),
-})
+const WhatsAppContactSchema = z
+  .object({
+    wa_id: z.string().optional(),
+    user_id: z.string().optional(),
+    profile: z
+      .object({
+        name: z.string().optional(),
+      })
+      .optional(),
+  })
+  .refine((contact) => contact.wa_id !== undefined || contact.user_id !== undefined, {
+    message: 'Contact must include at least one of `wa_id` or `user_id`',
+  })
 
 const WhatsAppBaseMessageSchema = z.object({
   from: z.string(),
@@ -174,6 +179,7 @@ const WhatsAppStatusSchema = z.object({
   status: z.enum(['sent', 'delivered', 'read', 'failed']),
   timestamp: z.string(),
   recipient_id: z.string(),
+  recipient_user_id: z.string().optional(),
   errors: z
     .array(
       z.object({

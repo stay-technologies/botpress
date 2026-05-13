@@ -59,6 +59,13 @@ export const statusHandler = async (value: WhatsAppStatusValue, props: bp.Handle
     await client.updateMessage({ id: message.id, tags: { status: value.status.toUpperCase() } })
   }
 
+  if (value.recipient_user_id) {
+    await client.updateConversation({
+      id: message.conversationId,
+      tags: { bsuid: value.recipient_user_id },
+    })
+  }
+
   switch (value.status) {
     case 'sent':
       await client.createEvent({
