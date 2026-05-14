@@ -43,7 +43,7 @@ const _handleJoinCommand = async (props: bp.HandlerProps) => {
   const whatsapp = await getAuthenticatedWhatsappClient(client, ctx)
 
   await whatsapp.markAsRead(botPhoneNumberId, message.id, 'text')
-  await whatsapp.sendMessage(botPhoneNumberId, userPhoneNumber, new Text(CONVERSATION_CONNECTED_MESSAGE))
+  await whatsapp.sendMessage(botPhoneNumberId, { phone: userPhoneNumber }, new Text(CONVERSATION_CONNECTED_MESSAGE))
   return
 }
 
@@ -60,7 +60,7 @@ const _handleLeaveCommand = async (props: bp.HandlerProps) => {
   const whatsapp = await getAuthenticatedWhatsappClient(client, ctx)
 
   await whatsapp.markAsRead(botPhoneNumberId, message.id, 'text')
-  await whatsapp.sendMessage(botPhoneNumberId, userPhoneNumber, new Text(CONVERSATION_DISCONNECTED_MESSAGE))
+  await whatsapp.sendMessage(botPhoneNumberId, { phone: userPhoneNumber }, new Text(CONVERSATION_DISCONNECTED_MESSAGE))
   return
 }
 
