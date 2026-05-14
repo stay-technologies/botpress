@@ -48,10 +48,15 @@ const getServerProps = (
     integrationId: ctx.integrationId,
     integrationAlias: ctx.integrationAlias,
     retry: retryConfig,
-    headers: extractTracingHeaders(req.headers),
+    headers: instance.managesOwnTracePropagation ? {} : extractTracingHeaders(req.headers),
   })
   const client = new IntegrationSpecificClient<BaseIntegration>(vanillaClient)
-  const logger = new IntegrationLogger({ traceId })
+  const logger = new IntegrationLogger({
+    traceId,
+    botId: ctx.botId,
+    integrationId: ctx.integrationId,
+    integrationAlias: ctx.integrationAlias,
+  })
 
   return {
     ctx,

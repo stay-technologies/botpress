@@ -18,6 +18,14 @@ const toJSONSchemaOptions: Partial<z.transforms.JSONSchemaGenerationOptions> = {
 const MAX_BUTTON_LABEL_LENGTH = 20
 
 const commonConfigSchema = z.object({
+  messageReadBehavior: z
+    .enum(['mark_as_read', 'typing_indicator', 'none'])
+    .default('typing_indicator')
+    .title('Message Read Behavior')
+    .describe(
+      'Behavior to adopt when a message is received from WhatsApp. "mark_as_read" will mark the message as read immediately, "typing_indicator" will show a typing indicator for a few seconds after marking the message as read, and "none" will do neither and block the typing indicator\'s emoji (leaving the message unread until a reply is sent).'
+    ),
+  // TODO: in the next major version unify this with messageReadBehavior
   typingIndicatorEmoji: z
     .boolean()
     .default(false)
@@ -37,6 +45,14 @@ const commonConfigSchema = z.object({
     .title('Downloaded Media Expiry')
     .describe(
       'Expiry time in hours for downloaded media files. An expiry time of 0 means the files will never expire.'
+    ),
+  listenMessageEchoes: z
+    .boolean()
+    .default(false)
+    .optional()
+    .title('Listen Message Echoes')
+    .describe(
+      'When enabled, triggers an onMessageEchoReceived event when an external message is echoed via the webhook.'
     ),
 })
 
@@ -77,9 +93,51 @@ const startConversationProps = {
           templateVariablesJson: z
             .string()
             .optional()
-            .title('Message Template variables')
+            .title('[DEPRECATED] Message Template variables')
             .describe(
-              'JSON array representation of variable values to pass to the WhatsApp Message Template (if required by the template). Currently, only positional parameters are supported.'
+              'Deprecated: use templateBodyParams instead. JSON array of body variable values: ["val1", "val2"].'
+            ),
+          templateHeaderParams: z
+            .discriminatedUnion('type', [
+              z.object({ type: z.literal('text'), value: z.string(), parameterName: z.string().optional() }),
+              z.object({ type: z.literal('image'), url: z.string() }),
+              z.object({ type: z.literal('video'), url: z.string() }),
+              z.object({ type: z.literal('document'), url: z.string(), filename: z.string().optional() }),
+            ])
+            .optional()
+            .title('Template header parameters')
+            .describe(
+              'Header parameter. ' +
+                'For text headers: type="text", value is the replacement text, parameterName is optional (for named params). ' +
+                'For media headers: type="image"|"video"|"document", url is the media URL. Documents may include a filename.'
+            ),
+          templateBodyParams: z
+            .discriminatedUnion('type', [
+              z.object({ type: z.literal('positional'), values: z.array(z.string()) }),
+              z.object({ type: z.literal('named'), values: z.record(z.string()) }),
+            ])
+            .optional()
+            .title('Template body parameters')
+            .describe(
+              'Body parameters. ' +
+                'For positional params ({{1}}, {{2}}, ...): type="positional", values is an ordered array of strings. ' +
+                'For named params ({{buyer_name}}): type="named", values is a record mapping param names to values.'
+            ),
+          templateButtonParams: z
+            .array(
+              z.discriminatedUnion('type', [
+                z.object({ type: z.literal('url'), value: z.string() }),
+                z.object({ type: z.literal('quick_reply'), payload: z.string() }),
+                z.object({ type: z.literal('copy_code'), code: z.string() }),
+                z.object({ type: z.literal('skip') }),
+              ])
+            )
+            .optional()
+            .title('Template button parameters')
+            .describe(
+              'Button parameters as an ordered array. ' +
+                'url: value is the URL suffix. quick_reply: payload is the callback data. ' +
+                'copy_code: code is the coupon code. skip: no parameter needed (for phone number buttons, etc.).'
             ),
           botPhoneNumberId: z
             .string()
@@ -98,8 +156,8 @@ const defaultBotPhoneNumberId = {
   description: 'Default Phone ID used by the bot for starting conversations',
 }
 
-export const INTEGRATION_NAME = 'whatsapp'
-export const INTEGRATION_VERSION = '4.10.0'
+export const INTEGRATION_NAME = 'whatsapp-stay'
+export const INTEGRATION_VERSION = '1.0.8'
 export default new IntegrationDefinition({
   name: INTEGRATION_NAME,
   version: INTEGRATION_VERSION,
@@ -280,6 +338,14 @@ export default new IntegrationDefinition({
             title: 'Referral Source ID',
             description: 'The ID of the ad or content that led to the conversation',
           },
+          echoCreationType: {
+            title: 'Echo Creation Type',
+            description: 'For echoed messages: the creation type reported by WhatsApp (e.g. "created_by_1p_bot")',
+          },
+          status: {
+            title: 'Delivery Status',
+            description: 'Latest WhatsApp delivery status reported via webhook (SENT, DELIVERED, READ, FAILED).',
+          },
         },
       },
       conversation: {
@@ -306,6 +372,10 @@ export default new IntegrationDefinition({
         title: 'Name',
         description: 'WhatsApp user display name',
       },
+      number: {
+        title: 'Phone Number',
+        description: 'WhatsApp phone number of the user',
+      },
     },
   },
   actions: {
@@ -314,6 +384,7 @@ export default new IntegrationDefinition({
       output: {
         schema: z.object({
           conversationId: z.string().title('Conversation ID').describe('ID of the conversation created'),
+          messageId: z.string().optional().title('Message ID').describe('ID of the message created'),
         }),
       },
     },
@@ -324,6 +395,7 @@ export default new IntegrationDefinition({
       output: {
         schema: z.object({
           conversationId: z.string().title('Conversation ID').describe('ID of the conversation created'),
+          messageId: z.string().optional().title('Message ID').describe('ID of the message created'),
         }),
       },
     },
@@ -423,6 +495,73 @@ export default new IntegrationDefinition({
         }),
       },
     },
+    startFlow: {
+      title: 'Start Flow',
+      description: 'Sends an Interactive Flow message to a WhatsApp user',
+      input: {
+        schema: z.object({
+          conversation: z.object({
+            userPhone: z
+              .string()
+              .min(1)
+              .title('User Phone Number')
+              .describe('Phone number of the WhatsApp user to start a conversation with'),
+            botPhoneNumberId: z
+              .string()
+              .optional()
+              .title('Bot Phone Number ID')
+              .describe('Phone number ID to use as sender (uses the default phone number ID if not provided)'),
+          }),
+          bodyText: z.string().min(1).title('Body Text').describe('Text body to show above the Flow CTA'),
+          flow: z
+            .object({
+              flowId: z.string().optional().title('Flow ID').describe('Unique ID of the Flow provided by WhatsApp'),
+              flowName: z
+                .string()
+                .optional()
+                .title('Flow Name')
+                .describe('Flow name provided by the business as an alternative to Flow ID'),
+              flowCta: z
+                .string()
+                .min(1)
+                .max(20)
+                .title('Flow CTA')
+                .describe('Text on the CTA button (max 20 characters, no emoji)'),
+              flowToken: z
+                .string()
+                .optional()
+                .title('Flow Token')
+                .describe('Business-generated token for identifying the Flow execution'),
+              mode: z
+                .enum(['published', 'draft'])
+                .optional()
+                .title('Mode')
+                .describe('Whether the Flow is in published or draft mode'),
+              flowAction: z
+                .enum(['navigate', 'data_exchange'])
+                .optional()
+                .default('navigate')
+                .title('Flow Action')
+                .describe('Type of Flow interaction'),
+              screen: z
+                .string()
+                .optional()
+                .title('First Screen ID')
+                .describe('Required when Flow Action is "navigate"'),
+              dataJson: z
+                .string()
+                .optional()
+                .title('Initial Data JSON')
+                .describe('Non-empty JSON object passed to the first screen when navigating'),
+            }),
+        }),
+      },
+      output: {
+        schema: z.object({
+          conversationId: z.string().title('Conversation ID').describe('ID of the conversation used/created'),
+        }),
+      },
+    },
   },
   events: {
     messageSent: {
@@ -445,6 +584,12 @@ export default new IntegrationDefinition({
     messageRead: {
       title: 'Message Read',
       description: 'Triggered when a user reads a message',
+      schema: z.object({}),
+    },
+    onMessageEchoReceived: {
+      title: 'Message Echo Received',
+      description:
+        'Triggered when an outbound message sent through another channel (e.g. a human agent) is echoed back via the webhook',
       schema: z.object({}),
     },
     reactionAdded: {
@@ -553,6 +698,8 @@ export default new IntegrationDefinition({
   },
   attributes: {
     category: 'Communication & Channels',
+    guideSlug: 'whatsapp',
+    repo: 'botpress',
   },
   __advanced: {
     toJSONSchemaOptions,
