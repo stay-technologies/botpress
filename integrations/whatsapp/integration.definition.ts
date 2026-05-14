@@ -74,18 +74,9 @@ const startConversationProps = {
           userPhone: z
             .string()
             .min(1)
-            .optional()
             .title('User Phone Number')
             .describe(
-              'Phone number of the WhatsApp user to start a conversation with. Add the country code (e.g. +81 for japan). At least one of userPhone or userBsuid must be provided.'
-            ),
-          userBsuid: z
-            .string()
-            .min(1)
-            .optional()
-            .title('User BSUID')
-            .describe(
-              'Business-Scoped User ID (BSUID) of the WhatsApp user, format `{ISO 3166}.{alphanumeric}` (e.g. "BR.X"). At least one of userPhone or userBsuid must be provided.'
+              'Phone number of the WhatsApp user to start a conversation with. Add the country code (e.g. +81 for japan)'
             ),
           templateName: z
             .string()
@@ -518,29 +509,19 @@ export default new IntegrationDefinition({
       description: 'Sends an Interactive Flow message to a WhatsApp user',
       input: {
         schema: z.object({
-          conversation: z.object({
-            userPhone: z
-              .string()
-              .min(1)
-              .optional()
-              .title('User Phone Number')
-              .describe(
-                'Phone number of the WhatsApp user to start a conversation with. At least one of userPhone or userBsuid must be provided.'
-              ),
-            userBsuid: z
-              .string()
-              .min(1)
-              .optional()
-              .title('User BSUID')
-              .describe(
-                'Business-Scoped User ID (BSUID) of the WhatsApp user, format `{ISO 3166}.{alphanumeric}`. At least one of userPhone or userBsuid must be provided.'
-              ),
-            botPhoneNumberId: z
-              .string()
-              .optional()
-              .title('Bot Phone Number ID')
-              .describe('Phone number ID to use as sender (uses the default phone number ID if not provided)'),
-          })
+          conversation: z
+            .object({
+              userPhone: z
+                .string()
+                .min(1)
+                .title('User Phone Number')
+                .describe('Phone number of the WhatsApp user to start a conversation with'),
+              botPhoneNumberId: z
+                .string()
+                .optional()
+                .title('Bot Phone Number ID')
+                .describe('Phone number ID to use as sender (uses the default phone number ID if not provided)'),
+            })
             .title('Conversation Details')
             .describe('Details of the conversation to start'),
           bodyText: z.string().min(1).title('Body Text').describe('Text body to show above the Flow CTA'),

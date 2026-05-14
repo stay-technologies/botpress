@@ -3,7 +3,6 @@ import { INTEGRATION_NAME, INTEGRATION_VERSION } from 'integration.definition'
 import { Language, Template } from 'whatsapp-api-js/messages'
 import type { TemplateComponent } from 'whatsapp-api-js/types'
 import { getDefaultBotPhoneNumberId, getAuthenticatedWhatsappClient } from '../auth'
-import { chooseSendRecipient, MissingWhatsAppRecipientError } from '../misc/identifier-decision'
 import { safeFormatPhoneNumber } from '../misc/phone-number-to-whatsapp'
 import {
   generateSyntheticTemplateText,
@@ -37,17 +36,12 @@ export const startConversation: bp.IntegrationProps['actions']['startConversatio
 
   const {
     userPhone,
-    userBsuid,
     templateName,
     templateVariablesJson,
     templateHeaderParams,
     templateBodyParams,
     templateButtonParams,
   } = input.conversation
-
-  if (!userPhone && !userBsuid) {
-    logForBotAndThrow('Either userPhone or userBsuid must be provided', logger)
-  }
   const botPhoneNumberId = input.conversation.botPhoneNumberId
     ? input.conversation.botPhoneNumberId
     : await getDefaultBotPhoneNumberId(client, ctx).catch(() => {
@@ -88,54 +82,37 @@ export const startConversation: bp.IntegrationProps['actions']['startConversatio
     templateApiComponents.push(...buildButtonComponents(templateButtonParams))
   }
 
-  let formattedPhone: string | undefined
-  if (userPhone) {
-    const formatPhoneNumberResponse = safeFormatPhoneNumber(userPhone)
-    if (formatPhoneNumberResponse.success === false) {
-      const distinctId = formatPhoneNumberResponse.error.id
-      await posthogHelper.sendPosthogEvent(
-        {
-          distinctId: distinctId ?? 'no id',
-          event: 'invalid_phone_number',
-          properties: {
-            from: 'action',
-            phoneNumber: userPhone,
-          },
+  const formatPhoneNumberResponse = safeFormatPhoneNumber(userPhone)
+  if (formatPhoneNumberResponse.success === false) {
+    const distinctId = formatPhoneNumberResponse.error.id
+    await posthogHelper.sendPosthogEvent(
+      {
+        distinctId: distinctId ?? 'no id',
+        event: 'invalid_phone_number',
+        properties: {
+          from: 'action',
+          phoneNumber: userPhone,
         },
-        { integrationName: INTEGRATION_NAME, integrationVersion: INTEGRATION_VERSION, key: bp.secrets.POSTHOG_KEY }
-      )
-      const errorMessage = formatPhoneNumberResponse.error.message
-      logForBotAndThrow(`Failed to parse phone number "${userPhone}": ${errorMessage}`, logger)
-    }
-    formattedPhone = formatPhoneNumberResponse.phoneNumber
+      },
+      { integrationName: INTEGRATION_NAME, integrationVersion: INTEGRATION_VERSION, key: bp.secrets.POSTHOG_KEY }
+    )
+    const errorMessage = formatPhoneNumberResponse.error.message
+    logForBotAndThrow(`Failed to parse phone number "${userPhone}": ${errorMessage}`, logger)
   }
-
-  const conversationTags: Record<string, string> = {
-    botPhoneNumberId,
-  }
-  if (formattedPhone) conversationTags.userPhone = formattedPhone
-  if (userBsuid) conversationTags.bsuid = userBsuid
 
   const { conversation } = await client.getOrCreateConversation({
     channel: 'channel',
-    tags: conversationTags,
+    tags: {
+      botPhoneNumberId,
+      userPhone: formatPhoneNumberResponse.phoneNumber,
+    },
   })
-
-  let recipient: { kind: 'phone' | 'bsuid'; value: string }
-  try {
-    recipient = chooseSendRecipient({ userPhone: formattedPhone, bsuid: userBsuid })
-  } catch (err) {
-    if (err instanceof MissingWhatsAppRecipientError) {
-      logForBotAndThrow(err.message, logger)
-    }
-    throw err
-  }
 
   const whatsapp = await getAuthenticatedWhatsappClient(client, ctx)
   const language = new Language(templateLanguage)
   const template = new Template(templateName, language, ...templateApiComponents)
 
-  const response = await whatsapp.sendMessage(botPhoneNumberId, recipient.value, template)
+  const response = await whatsapp.sendMessage(botPhoneNumberId, userPhone, template)
 
   if ('error' in response) {
     const errorJSON = JSON.stringify(response.error)

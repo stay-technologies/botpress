@@ -1,7 +1,6 @@
 import { RuntimeError, z } from '@botpress/sdk'
 import { getDefaultBotPhoneNumberId, getAuthenticatedWhatsappClient } from '../auth'
 import { Interactive, Body, ActionFlow } from 'whatsapp-api-js/messages'
-import { chooseSendRecipient, MissingWhatsAppRecipientError } from '../misc/identifier-decision'
 import * as bp from '.botpress'
 
 const NonEmptyObjectSchema = z
@@ -18,14 +17,10 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
   }
 
   const {
-    conversation: { userPhone, userBsuid, botPhoneNumberId: maybeBotPhoneNumberId },
+    conversation: { userPhone, botPhoneNumberId: maybeBotPhoneNumberId },
     bodyText,
     flow,
   } = input
-
-  if (!userPhone && !userBsuid) {
-    _logForBotAndThrow('Either userPhone or userBsuid must be provided', logger)
-  }
 
   const botPhoneNumberId = maybeBotPhoneNumberId
     ? maybeBotPhoneNumberId
@@ -33,24 +28,13 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
         _logForBotAndThrow('No default bot phone number ID available', logger)
       })
 
-  const conversationTags: Record<string, string> = { botPhoneNumberId }
-  if (userPhone) conversationTags.userPhone = userPhone
-  if (userBsuid) conversationTags.bsuid = userBsuid
-
   const { conversation } = await client.getOrCreateConversation({
     channel: 'channel',
-    tags: conversationTags,
+    tags: {
+      botPhoneNumberId,
+      userPhone,
+    },
   })
-
-  let recipient: { kind: 'phone' | 'bsuid'; value: string }
-  try {
-    recipient = chooseSendRecipient({ userPhone, bsuid: userBsuid })
-  } catch (err) {
-    if (err instanceof MissingWhatsAppRecipientError) {
-      _logForBotAndThrow(err.message, logger)
-    }
-    throw err
-  }
 
   const whatsapp = await getAuthenticatedWhatsappClient(client, ctx)
 
@@ -113,7 +97,7 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
 
   const interactive = new Interactive(new ActionFlow(parameters), new Body(bodyText))
 
-  const response = await whatsapp.sendMessage(botPhoneNumberId, recipient.value, interactive)
+  const response = await whatsapp.sendMessage(botPhoneNumberId, userPhone, interactive)
 
   if ('error' in response) {
     const errorJSON = JSON.stringify(response.error)
