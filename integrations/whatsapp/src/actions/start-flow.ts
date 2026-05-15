@@ -1,7 +1,7 @@
 import { RuntimeError, z } from '@botpress/sdk'
 import { getDefaultBotPhoneNumberId, getAuthenticatedWhatsappClient } from '../auth'
 import { Interactive, Body, ActionFlow } from 'whatsapp-api-js/messages'
-import { chooseSendRecipient } from '../misc/identifier-decision'
+import { buildConversationTags, chooseSendRecipient } from '../misc/identifier-decision'
 import * as bp from '.botpress'
 
 const NonEmptyObjectSchema = z
@@ -33,13 +33,9 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
         _logForBotAndThrow('No default bot phone number ID available', logger)
       })
 
-  const conversationTags: Record<string, string> = { botPhoneNumberId }
-  if (userPhone) conversationTags.userPhone = userPhone
-  if (userBsuid) conversationTags.bsuid = userBsuid
-
   const { conversation } = await client.getOrCreateConversation({
     channel: 'channel',
-    tags: conversationTags,
+    tags: buildConversationTags({ botPhoneNumberId, userPhone, bsuid: userBsuid }),
   })
 
   const recipient = chooseSendRecipient({ userPhone, bsuid: userBsuid })

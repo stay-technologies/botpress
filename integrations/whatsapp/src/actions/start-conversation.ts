@@ -3,7 +3,7 @@ import { INTEGRATION_NAME, INTEGRATION_VERSION } from 'integration.definition'
 import { Language, Template } from 'whatsapp-api-js/messages'
 import type { TemplateComponent } from 'whatsapp-api-js/types'
 import { getDefaultBotPhoneNumberId, getAuthenticatedWhatsappClient } from '../auth'
-import { chooseSendRecipient } from '../misc/identifier-decision'
+import { buildConversationTags, chooseSendRecipient } from '../misc/identifier-decision'
 import { safeFormatPhoneNumber } from '../misc/phone-number-to-whatsapp'
 import {
   generateSyntheticTemplateText,
@@ -110,15 +110,9 @@ export const startConversation: bp.IntegrationProps['actions']['startConversatio
     formattedPhone = formatPhoneNumberResponse.phoneNumber
   }
 
-  const conversationTags: Record<string, string> = {
-    botPhoneNumberId,
-  }
-  if (formattedPhone) conversationTags.userPhone = formattedPhone
-  if (userBsuid) conversationTags.bsuid = userBsuid
-
   const { conversation } = await client.getOrCreateConversation({
     channel: 'channel',
-    tags: conversationTags,
+    tags: buildConversationTags({ botPhoneNumberId, userPhone: formattedPhone, bsuid: userBsuid }),
   })
 
   const recipient = chooseSendRecipient({ userPhone: formattedPhone, bsuid: userBsuid })
