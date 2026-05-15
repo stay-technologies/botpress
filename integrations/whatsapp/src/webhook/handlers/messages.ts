@@ -4,6 +4,7 @@ import { ValueOf } from '@botpress/sdk/dist/utils/type-utils'
 import axios from 'axios'
 import { INTEGRATION_NAME, INTEGRATION_VERSION } from 'integration.definition'
 import { getAccessToken, getAuthenticatedWhatsappClient } from '../../auth'
+import { extractContactIdentifiers } from '../../misc/bsuid-extraction'
 import { safeFormatPhoneNumber } from '../../misc/phone-number-to-whatsapp'
 import { WhatsAppMessage, WhatsAppMessageValue } from '../../misc/types'
 import { getMessageFromWhatsappMessageId } from '../../misc/util'
@@ -43,43 +44,64 @@ export const messagesHandler = async (
   const phoneNumberId = value.metadata.phone_number_id
   await whatsapp.markAsRead(phoneNumberId, message.id)
 
-  const formatPhoneNumberResponse = safeFormatPhoneNumber(message.from)
-  if (formatPhoneNumberResponse.success === false) {
-    const distinctId = formatPhoneNumberResponse.error.id
-    await posthogHelper.sendPosthogEvent(
-      {
-        distinctId: distinctId ?? 'no id',
-        event: 'invalid_phone_number',
-        properties: {
-          from: 'handler',
-          phoneNumber: message.from,
-        },
-      },
-      { integrationName: INTEGRATION_NAME, integrationVersion: INTEGRATION_VERSION, key: bp.secrets.POSTHOG_KEY }
-    )
-    const errorMessage = formatPhoneNumberResponse.error.message
-    logger.error(`Failed to parse phone number "${message.from}": ${errorMessage}`)
-  }
-
-  const { conversation } = await client.getOrCreateConversation({
-    channel: 'channel',
-    tags: {
-      userPhone: formatPhoneNumberResponse.success ? formatPhoneNumberResponse.phoneNumber : message.from,
-      botPhoneNumberId: value.metadata.phone_number_id,
-    },
-  })
-
   const { contacts } = value
   const contact = contacts?.[0]
   if (!contact) {
     logger.forBot().warn('No contacts found, ignoring message')
     return
   }
+
+  const { bsuid, phone } = extractContactIdentifiers(contact)
+
+  let userPhone: string | undefined
+  if (phone) {
+    const formatPhoneNumberResponse = safeFormatPhoneNumber(phone)
+    if (formatPhoneNumberResponse.success === false) {
+      const distinctId = formatPhoneNumberResponse.error.id
+      await posthogHelper.sendPosthogEvent(
+        {
+          distinctId: distinctId ?? 'no id',
+          event: 'invalid_phone_number',
+          properties: {
+            from: 'handler',
+            phoneNumber: phone,
+          },
+        },
+        { integrationName: INTEGRATION_NAME, integrationVersion: INTEGRATION_VERSION, key: bp.secrets.POSTHOG_KEY }
+      )
+      const errorMessage = formatPhoneNumberResponse.error.message
+      logger.error(`Failed to parse phone number "${phone}": ${errorMessage}`)
+      userPhone = phone
+    } else {
+      userPhone = formatPhoneNumberResponse.phoneNumber
+    }
+  }
+
+  const botpressUserId = bsuid ?? phone
+  if (!botpressUserId) {
+    logger.forBot().warn('Contact has neither user_id nor wa_id, ignoring message')
+    return
+  }
+
+  const conversationTags: Record<string, string> = {
+    botPhoneNumberId: value.metadata.phone_number_id,
+  }
+  if (userPhone) conversationTags.userPhone = userPhone
+  if (bsuid) conversationTags.bsuid = bsuid
+
+  const { conversation } = await client.getOrCreateConversation({
+    channel: 'channel',
+    tags: conversationTags,
+  })
+
+  const userTags: Record<string, string | undefined> = {
+    userId: botpressUserId,
+    name: contact.profile?.name,
+  }
+  if (bsuid) userTags.bsuid = bsuid
+
   const { user } = await client.getOrCreateUser({
-    tags: {
-      userId: contact.wa_id,
-      name: contact.profile?.name,
-    },
+    tags: userTags,
     name: contact.profile?.name,
     discriminateByTags: ['userId'],
   })

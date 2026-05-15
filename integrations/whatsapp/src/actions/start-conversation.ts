@@ -112,7 +112,7 @@ export const startConversation: bp.IntegrationProps['actions']['startConversatio
   const language = new Language(templateLanguage)
   const template = new Template(templateName, language, ...templateApiComponents)
 
-  const response = await whatsapp.sendMessage(botPhoneNumberId, userPhone, template)
+  const response = await whatsapp.sendMessage(botPhoneNumberId, { phone: userPhone }, template)
 
   if ('error' in response) {
     const errorJSON = JSON.stringify(response.error)
