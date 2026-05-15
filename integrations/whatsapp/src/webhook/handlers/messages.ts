@@ -5,6 +5,7 @@ import axios from 'axios'
 import { INTEGRATION_NAME, INTEGRATION_VERSION } from 'integration.definition'
 import { getAccessToken, getAuthenticatedWhatsappClient } from '../../auth'
 import { extractContactIdentifiers } from '../../misc/bsuid-extraction'
+import { buildConversationTags } from '../../misc/identifier-decision'
 import { safeFormatPhoneNumber } from '../../misc/phone-number-to-whatsapp'
 import { WhatsAppMessage, WhatsAppMessageValue } from '../../misc/types'
 import { getMessageFromWhatsappMessageId } from '../../misc/util'
@@ -83,15 +84,9 @@ export const messagesHandler = async (
     return
   }
 
-  const conversationTags: Record<string, string> = {
-    botPhoneNumberId: value.metadata.phone_number_id,
-  }
-  if (userPhone) conversationTags.userPhone = userPhone
-  if (bsuid) conversationTags.bsuid = bsuid
-
   const { conversation } = await client.getOrCreateConversation({
     channel: 'channel',
-    tags: conversationTags,
+    tags: buildConversationTags({ botPhoneNumberId: value.metadata.phone_number_id, userPhone, bsuid }),
   })
 
   const userTags: Record<string, string | undefined> = {

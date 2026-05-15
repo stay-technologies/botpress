@@ -1,6 +1,7 @@
 import { RuntimeError, z } from '@botpress/sdk'
 import { getDefaultBotPhoneNumberId, getAuthenticatedWhatsappClient } from '../auth'
 import { Interactive, Body, ActionFlow } from 'whatsapp-api-js/messages'
+import { buildConversationTags, chooseSendRecipient } from '../misc/identifier-decision'
 import * as bp from '.botpress'
 
 const NonEmptyObjectSchema = z
@@ -17,10 +18,14 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
   }
 
   const {
-    conversation: { userPhone, botPhoneNumberId: maybeBotPhoneNumberId },
+    conversation: { userPhone, userBsuid, botPhoneNumberId: maybeBotPhoneNumberId },
     bodyText,
     flow,
   } = input
+
+  if (!userPhone && !userBsuid) {
+    _logForBotAndThrow('Either userPhone or userBsuid must be provided', logger)
+  }
 
   const botPhoneNumberId = maybeBotPhoneNumberId
     ? maybeBotPhoneNumberId
@@ -30,11 +35,10 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
 
   const { conversation } = await client.getOrCreateConversation({
     channel: 'channel',
-    tags: {
-      botPhoneNumberId,
-      userPhone,
-    },
+    tags: buildConversationTags({ botPhoneNumberId, userPhone, bsuid: userBsuid }),
   })
+
+  const recipient = chooseSendRecipient({ userPhone, bsuid: userBsuid })
 
   const whatsapp = await getAuthenticatedWhatsappClient(client, ctx)
 
@@ -97,7 +101,7 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
 
   const interactive = new Interactive(new ActionFlow(parameters), new Body(bodyText))
 
-  const response = await whatsapp.sendMessage(botPhoneNumberId, { phone: userPhone }, interactive)
+  const response = await whatsapp.sendMessage(botPhoneNumberId, recipient, interactive)
 
   if ('error' in response) {
     const errorJSON = JSON.stringify(response.error)
