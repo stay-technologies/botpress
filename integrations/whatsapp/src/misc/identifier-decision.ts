@@ -3,11 +3,6 @@ export type RecipientTags = {
   bsuid?: string
 }
 
-export type IdentifierPayload = {
-  bsuid?: string
-  phone?: string
-}
-
 export type SendRecipient = { phone: string } | { bsuid: string }
 
 export class MissingWhatsAppRecipientError extends Error {
@@ -28,6 +23,3 @@ export const chooseSendRecipient = (tags: RecipientTags): SendRecipient => {
   }
   throw new MissingWhatsAppRecipientError()
 }
-
-export const hasSufficientIdentifier = (payload: IdentifierPayload): boolean =>
-  Boolean(payload.bsuid) || Boolean(payload.phone)

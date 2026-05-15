@@ -298,7 +298,7 @@ async function _send({ client, ctx, conversation, logger, message, ack }: SendMe
   if ('bsuid' in recipient) {
     logger
       .forBot()
-      .info(
+      .debug(
         `Sending WhatsApp ${messageType} via BSUID fallback (no userPhone tag on conversation; bsuid="${recipient.bsuid}").`
       )
   }

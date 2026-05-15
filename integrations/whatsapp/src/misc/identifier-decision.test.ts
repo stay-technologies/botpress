@@ -1,7 +1,6 @@
 import { test, expect } from 'vitest'
 import {
   chooseSendRecipient,
-  hasSufficientIdentifier,
   MissingWhatsAppRecipientError,
 } from './identifier-decision'
 
@@ -26,24 +25,4 @@ test('chooseSendRecipient: throws MissingWhatsAppRecipientError when neither is 
 
 test('chooseSendRecipient: throws MissingWhatsAppRecipientError when both are empty strings', () => {
   expect(() => chooseSendRecipient({ userPhone: '', bsuid: '' })).toThrow(MissingWhatsAppRecipientError)
-})
-
-test('hasSufficientIdentifier: true when both present', () => {
-  expect(hasSufficientIdentifier({ bsuid: 'BR.X', phone: '5511999999999' })).toBe(true)
-})
-
-test('hasSufficientIdentifier: true when only bsuid', () => {
-  expect(hasSufficientIdentifier({ bsuid: 'BR.X' })).toBe(true)
-})
-
-test('hasSufficientIdentifier: true when only phone', () => {
-  expect(hasSufficientIdentifier({ phone: '5511999999999' })).toBe(true)
-})
-
-test('hasSufficientIdentifier: false when neither present', () => {
-  expect(hasSufficientIdentifier({})).toBe(false)
-})
-
-test('hasSufficientIdentifier: false when both empty strings', () => {
-  expect(hasSufficientIdentifier({ bsuid: '', phone: '' })).toBe(false)
 })

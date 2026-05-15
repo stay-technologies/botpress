@@ -1,7 +1,7 @@
 import { RuntimeError, z } from '@botpress/sdk'
 import { getDefaultBotPhoneNumberId, getAuthenticatedWhatsappClient } from '../auth'
 import { Interactive, Body, ActionFlow } from 'whatsapp-api-js/messages'
-import { chooseSendRecipient, MissingWhatsAppRecipientError, type SendRecipient } from '../misc/identifier-decision'
+import { chooseSendRecipient } from '../misc/identifier-decision'
 import * as bp from '.botpress'
 
 const NonEmptyObjectSchema = z
@@ -42,15 +42,7 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
     tags: conversationTags,
   })
 
-  let recipient: SendRecipient
-  try {
-    recipient = chooseSendRecipient({ userPhone, bsuid: userBsuid })
-  } catch (err) {
-    if (err instanceof MissingWhatsAppRecipientError) {
-      _logForBotAndThrow(err.message, logger)
-    }
-    throw err
-  }
+  const recipient = chooseSendRecipient({ userPhone, bsuid: userBsuid })
 
   const whatsapp = await getAuthenticatedWhatsappClient(client, ctx)
 

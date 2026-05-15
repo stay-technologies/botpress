@@ -3,7 +3,7 @@ import { INTEGRATION_NAME, INTEGRATION_VERSION } from 'integration.definition'
 import { Language, Template } from 'whatsapp-api-js/messages'
 import type { TemplateComponent } from 'whatsapp-api-js/types'
 import { getDefaultBotPhoneNumberId, getAuthenticatedWhatsappClient } from '../auth'
-import { chooseSendRecipient, MissingWhatsAppRecipientError, type SendRecipient } from '../misc/identifier-decision'
+import { chooseSendRecipient } from '../misc/identifier-decision'
 import { safeFormatPhoneNumber } from '../misc/phone-number-to-whatsapp'
 import {
   generateSyntheticTemplateText,
@@ -121,15 +121,7 @@ export const startConversation: bp.IntegrationProps['actions']['startConversatio
     tags: conversationTags,
   })
 
-  let recipient: SendRecipient
-  try {
-    recipient = chooseSendRecipient({ userPhone: formattedPhone, bsuid: userBsuid })
-  } catch (err) {
-    if (err instanceof MissingWhatsAppRecipientError) {
-      logForBotAndThrow(err.message, logger)
-    }
-    throw err
-  }
+  const recipient = chooseSendRecipient({ userPhone: formattedPhone, bsuid: userBsuid })
 
   const whatsapp = await getAuthenticatedWhatsappClient(client, ctx)
   const language = new Language(templateLanguage)
