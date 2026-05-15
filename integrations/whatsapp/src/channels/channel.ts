@@ -15,6 +15,7 @@ import {
 } from 'whatsapp-api-js/messages'
 import { getAuthenticatedWhatsappClient } from '../auth'
 import { WHATSAPP } from '../misc/constants'
+import { chooseSendRecipient, MissingWhatsAppRecipientError, type SendRecipient } from '../misc/identifier-decision'
 import { convertMarkdownToWhatsApp } from '../misc/markdown-to-whatsapp-rtf'
 import { splitTextMessageIfNeeded } from '../misc/split-text-message'
 import { sleep } from '../misc/util'
@@ -267,7 +268,6 @@ async function _send({ client, ctx, conversation, logger, message, ack }: SendMe
 
   const whatsapp = await getAuthenticatedWhatsappClient(client, ctx)
   const botPhoneNumberId = conversation.tags.botPhoneNumberId
-  const userPhoneNumber = conversation.tags.userPhone
   const messageType = message._type
 
   if (!botPhoneNumberId) {
@@ -277,11 +277,30 @@ async function _send({ client, ctx, conversation, logger, message, ack }: SendMe
     return
   }
 
-  if (!userPhoneNumber) {
+  let recipient: SendRecipient
+  try {
+    recipient = chooseSendRecipient({
+      userPhone: conversation.tags.userPhone,
+      bsuid: conversation.tags.bsuid,
+    })
+  } catch (err) {
+    if (err instanceof MissingWhatsAppRecipientError) {
+      logger
+        .forBot()
+        .error(
+          "Cannot send message to WhatsApp because neither 'userPhone' nor 'bsuid' is set in the conversation tags"
+        )
+      return
+    }
+    throw err
+  }
+
+  if ('bsuid' in recipient) {
     logger
       .forBot()
-      .error("Cannot send message to WhatsApp because the user's phone number isn't set in the conversation tags")
-    return
+      .info(
+        `Sending WhatsApp ${messageType} via BSUID fallback (no userPhone tag on conversation; bsuid="${recipient.bsuid}").`
+      )
   }
 
   const feedback = await repeat(
@@ -290,7 +309,7 @@ async function _send({ client, ctx, conversation, logger, message, ack }: SendMe
         logger.forBot().info(`Retrying to send ${messageType} message to WhatsApp (attempt ${i + 1}/${MAX_ATTEMPT})...`)
       }
 
-      const result = await whatsapp.sendMessage(botPhoneNumberId, { phone: userPhoneNumber }, message)
+      const result = await whatsapp.sendMessage(botPhoneNumberId, recipient, message)
       const repeat = 'error' in result && THROTTLING_CODES.has(result.error?.code ?? 0)
       return {
         repeat,
