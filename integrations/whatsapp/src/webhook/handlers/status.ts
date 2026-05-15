@@ -119,7 +119,7 @@ export const statusHandler = async (value: WhatsAppStatusValue, props: bp.Handle
                 `WhatsApp rejected the ${message.type} (code ${mediaErrorCode}); sending the URL as a plain text fallback to ${userPhone}.`
               )
             const whatsapp = await getAuthenticatedWhatsappClient(client, ctx)
-            await whatsapp.sendMessage(botPhoneNumberId, userPhone, new Text(mediaUrl))
+            await whatsapp.sendMessage(botPhoneNumberId, { phone: userPhone }, new Text(mediaUrl))
           }
         } catch (err) {
           logger.forBot().error('Failed to send the plain text URL fallback for the rejected media:', err)

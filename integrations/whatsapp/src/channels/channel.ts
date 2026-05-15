@@ -290,7 +290,7 @@ async function _send({ client, ctx, conversation, logger, message, ack }: SendMe
         logger.forBot().info(`Retrying to send ${messageType} message to WhatsApp (attempt ${i + 1}/${MAX_ATTEMPT})...`)
       }
 
-      const result = await whatsapp.sendMessage(botPhoneNumberId, userPhoneNumber, message)
+      const result = await whatsapp.sendMessage(botPhoneNumberId, { phone: userPhoneNumber }, message)
       const repeat = 'error' in result && THROTTLING_CODES.has(result.error?.code ?? 0)
       return {
         repeat,

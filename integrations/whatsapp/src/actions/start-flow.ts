@@ -97,7 +97,7 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
 
   const interactive = new Interactive(new ActionFlow(parameters), new Body(bodyText))
 
-  const response = await whatsapp.sendMessage(botPhoneNumberId, userPhone, interactive)
+  const response = await whatsapp.sendMessage(botPhoneNumberId, { phone: userPhone }, interactive)
 
   if ('error' in response) {
     const errorJSON = JSON.stringify(response.error)

@@ -24,7 +24,7 @@ export const startTypingIndicator: bp.IntegrationProps['actions']['startTypingIn
   })
   if (ctx.configuration.typingIndicatorEmoji) {
     void whatsapp
-      .sendMessage(botPhoneNumberId, userPhone, new Reaction(whatsappMessageId, '👀'))
+      .sendMessage(botPhoneNumberId, { phone: userPhone }, new Reaction(whatsappMessageId, '👀'))
       .catch((e) => logger.forBot().error(`Error sending typing indicator emoji: ${e ?? '[Unknown error]'}`))
   }
   return {}
@@ -42,7 +42,7 @@ export const stopTypingIndicator: bp.IntegrationProps['actions']['stopTypingIndi
   const { conversationId, messageId } = input
   const { botPhoneNumberId, userPhone } = await _getConversationInfos(client, conversationId)
   const { whatsappMessageId } = await _getMessageInfos(client, messageId)
-  await whatsapp.sendMessage(botPhoneNumberId, userPhone, new Reaction(whatsappMessageId))
+  await whatsapp.sendMessage(botPhoneNumberId, { phone: userPhone }, new Reaction(whatsappMessageId))
   return {}
 }
 
