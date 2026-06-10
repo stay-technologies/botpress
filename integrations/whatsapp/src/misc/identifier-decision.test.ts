@@ -26,3 +26,8 @@ test('chooseSendRecipient: throws MissingWhatsAppRecipientError when neither is 
 test('chooseSendRecipient: throws MissingWhatsAppRecipientError when both are empty strings', () => {
   expect(() => chooseSendRecipient({ userPhone: '', bsuid: '' })).toThrow(MissingWhatsAppRecipientError)
 })
+
+test('chooseSendRecipient: falls back to bsuid when phone is an empty string', () => {
+  const result = chooseSendRecipient({ userPhone: '', bsuid: 'BR.X' })
+  expect(result).toEqual({ bsuid: 'BR.X' })
+})

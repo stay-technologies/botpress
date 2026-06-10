@@ -73,7 +73,6 @@ const startConversationProps = {
         .object({
           userPhone: z
             .string()
-            .min(1)
             .optional()
             .title('User Phone Number')
             .describe(
@@ -81,7 +80,6 @@ const startConversationProps = {
             ),
           userBsuid: z
             .string()
-            .min(1)
             .optional()
             .title('User BSUID')
             .describe(
@@ -166,7 +164,7 @@ const defaultBotPhoneNumberId = {
 }
 
 export const INTEGRATION_NAME = 'whatsapp-stay'
-export const INTEGRATION_VERSION = '1.3.0'
+export const INTEGRATION_VERSION = '1.3.1'
 export default new IntegrationDefinition({
   name: INTEGRATION_NAME,
   version: INTEGRATION_VERSION,
@@ -521,7 +519,6 @@ export default new IntegrationDefinition({
           conversation: z.object({
             userPhone: z
               .string()
-              .min(1)
               .optional()
               .title('User Phone Number')
               .describe(
@@ -529,7 +526,6 @@ export default new IntegrationDefinition({
               ),
             userBsuid: z
               .string()
-              .min(1)
               .optional()
               .title('User BSUID')
               .describe(
