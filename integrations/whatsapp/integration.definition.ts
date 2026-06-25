@@ -717,6 +717,9 @@ export default new IntegrationDefinition({
     SANDBOX_PHONE_NUMBER_ID: {
       description: 'Phone number ID of the Sandbox WhatsApp Business profile',
     },
+    STATSIG_API_KEY: {
+      description: 'Statsig server SDK key used to evaluate feature toggles (e.g. inbound forwarding to Darwin)',
+    },
   },
   entities: {
     proactiveConversation: {

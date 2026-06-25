@@ -2252,6 +2252,9 @@ importers:
       preact-render-to-string:
         specifier: ^6.5.13
         version: 6.5.13(preact@10.26.6)
+      statsig-node:
+        specifier: ^6.5.1
+        version: 6.5.1
       whatsapp-api-js:
         specifier: 6.2.2-beta.0
         version: 6.2.2-beta.0
@@ -3035,7 +3038,7 @@ importers:
         version: 2.0.0
       '@bpinternal/zui':
         specifier: ^2.1.1
-        version: link:../zui
+        version: 2.3.0
       '@jitl/quickjs-singlefile-browser-release-sync':
         specifier: ^0.31.0
         version: 0.31.0
@@ -3135,7 +3138,7 @@ importers:
         version: link:../client
       '@bpinternal/zui':
         specifier: ^2.1.1
-        version: link:../zui
+        version: 2.3.0
       browser-or-node:
         specifier: ^2.1.1
         version: 2.1.1
@@ -3175,7 +3178,7 @@ importers:
         version: 1.0.2
       '@bpinternal/zui':
         specifier: ^2.1.1
-        version: link:../zui
+        version: 2.3.0
       json5:
         specifier: ^2.2.3
         version: 2.2.3
@@ -3221,7 +3224,7 @@ importers:
         version: 1.0.2
       '@bpinternal/zui':
         specifier: ^2.1.1
-        version: link:../zui
+        version: 2.3.0
       json5:
         specifier: ^2.2.3
         version: 2.2.3
@@ -4250,6 +4253,10 @@ packages:
 
   '@bpinternal/yargs-extra@0.0.3':
     resolution: {integrity: sha512-e/unlq0LX4CJUv1jGOv1UgwB/h2M0NCXnwD4lEw496GpkQikO668RS+BBlRhkqdGfZmvKDkXZZ96xJCn+i6Ymg==}
+
+  '@bpinternal/zui@2.3.0':
+    resolution: {integrity: sha512-U7LJnejsjB4tyzozP4ZuW2gs5CRqRtl4d1yAys56x0NDIlbxR5xF4lSSfSewLg9+gn0seyxDVRjZYrfMd2MbTg==}
+    engines: {node: '>=18.0.0'}
 
   '@colors/colors@1.6.0':
     resolution: {integrity: sha512-Ir+AOibqzrIsL6ajt3Rz3LskB7OiMVHqltZmspbW/TJuTVuyOMirVqAkjfY6JISiLHgyNqicAC8AyHHGzNd/dA==}
@@ -8987,6 +8994,9 @@ packages:
     resolution: {integrity: sha512-58yWmlHpp7VYfcdTwMTvwMmqx/Elfxjd9RXTDyMsbL7lLWmhMylLEqiYVLKuLzOZqVgiWXD9MfR62Vv89VRxkw==}
     engines: {node: '>=4'}
 
+  ip3country@5.0.0:
+    resolution: {integrity: sha512-lcFLMFU4eO1Z7tIpbVFZkaZ5ltqpeaRx7L9NsAbA9uA7/O/rj3RF8+evE5gDitooaTTIqjdzZrenFO/OOxQ2ew==}
+
   ipaddr.js@1.9.1:
     resolution: {integrity: sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==}
     engines: {node: '>= 0.10'}
@@ -11289,6 +11299,10 @@ packages:
   starkbank-ecdsa@1.1.5:
     resolution: {integrity: sha512-5O9CJ0QF6pTrtDg6dmaHy1GC/2wA1tcXsYanWOCzg+2cZrCDylEvEl6krzI4Zy8ryar00lHErRTT2Q61w/MUVA==}
 
+  statsig-node@6.5.1:
+    resolution: {integrity: sha512-/rKvMMN9SWTK8+b7MyRP1wOsStsKf55Mdj8O2ffV/bCQ/38bXYCC/GVd3gVvBSwVCibAnkTz2v1gpRJSIKsBIg==}
+    engines: {pnpm: never}
+
   statuses@2.0.1:
     resolution: {integrity: sha512-RwNA9Z/7PrK06rYLIzFMlaF+l73iwpzsqRIFgbMLbTcLD6cOao82TaWefPXQvB2fOC4AjuYSEndS7N/mTCbkdQ==}
     engines: {node: '>= 0.8'}
@@ -11795,6 +11809,10 @@ packages:
   typescript@5.8.3:
     resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
     engines: {node: '>=14.17'}
+    hasBin: true
+
+  ua-parser-js@1.0.41:
+    resolution: {integrity: sha512-LbBDqdIC5s8iROCUjMbW1f5dJQTEFB1+KO9ogbvlb3nm9n4YHa5p4KTvFPWvh2Hs8gZMBuiB1/8+pdfe/tDPug==}
     hasBin: true
 
   uc.micro@2.1.0:
@@ -13816,6 +13834,8 @@ snapshots:
       lodash: 4.17.21
       yargs: 17.7.2
       yn: 4.0.0
+
+  '@bpinternal/zui@2.3.0': {}
 
   '@colors/colors@1.6.0': {}
 
@@ -19425,6 +19445,8 @@ snapshots:
 
   ip-regex@2.1.0: {}
 
+  ip3country@5.0.0: {}
+
   ipaddr.js@1.9.1: {}
 
   is-alphabetical@1.0.4: {}
@@ -22281,6 +22303,15 @@ snapshots:
       big-integer: 1.6.52
       js-sha256: 0.9.0
 
+  statsig-node@6.5.1:
+    dependencies:
+      ip3country: 5.0.0
+      node-fetch: 2.7.0
+      ua-parser-js: 1.0.41
+      uuid: 8.3.2
+    transitivePeerDependencies:
+      - encoding
+
   statuses@2.0.1: {}
 
   statuses@2.0.2: {}
@@ -22869,6 +22900,8 @@ snapshots:
   typescript@5.7.2: {}
 
   typescript@5.8.3: {}
+
+  ua-parser-js@1.0.41: {}
 
   uc.micro@2.1.0: {}
 
