@@ -18,7 +18,8 @@ export async function isInboundForwardingEnabled(phone: string, logger: bp.Logge
     }
     return statsig.checkGateSync({ userID: phone }, INBOUND_FORWARDING_GATE)
   } catch (error) {
-    logger.forBot().error(`Failed to evaluate inbound forwarding feature toggle: ${error}`)
+    const message = error instanceof Error ? error.message : String(error)
+    logger.forBot().error(`Failed to evaluate inbound forwarding feature toggle: ${message}`)
     return false
   }
 }
