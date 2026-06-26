@@ -192,6 +192,29 @@ describe('buildInboundEnvelope', () => {
     expect(() => new Date(envelope.events[0]!.occurredAt).toISOString()).not.toThrow()
     expect(Number.isNaN(Date.parse(envelope.events[0]!.occurredAt))).toBe(false)
   })
+
+  test('empty/whitespace timestamp: treated as invalid (fallback to now), not epoch 0 / 1970', () => {
+    const { logger, error } = buildLogger()
+    const before = Date.now()
+    const message = buildTextMessage({ timestamp: '   ' })
+
+    const envelope = buildInboundEnvelope(message, buildValue(), buildContact(), logger as never)
+    const after = Date.now()
+
+    expect(error).toHaveBeenCalledTimes(1)
+    const occurredAtMs = Date.parse(envelope.events[0]!.occurredAt)
+    // Fallback is current time, NOT 1970 (which is what Number('   ') === 0 would produce)
+    expect(occurredAtMs).toBeGreaterThanOrEqual(before)
+    expect(occurredAtMs).toBeLessThanOrEqual(after)
+  })
+
+  test('contact is undefined: sender phone/bsuid/name all null, no throw', () => {
+    const { logger } = buildLogger()
+
+    const envelope = buildInboundEnvelope(buildTextMessage(), buildValue(), undefined, logger as never)
+
+    expect(envelope.events[0]!.sender).toEqual({ phone: null, bsuid: null, name: null })
+  })
 })
 
 describe('forwardInboundMessage', () => {
@@ -254,6 +277,23 @@ describe('forwardInboundMessage', () => {
     await forwardInboundMessage({
       url: '',
       apiKey: API_KEY,
+      phone: PHONE,
+      message: buildTextMessage(),
+      value: buildValue(),
+      contact: buildContact(),
+      logger: logger as never,
+    })
+
+    expect(mockedAxiosPost).not.toHaveBeenCalled()
+    expect(isInboundForwardingEnabled).not.toHaveBeenCalled()
+  })
+
+  test('DARWIN_API_KEY empty string: no POST and gate is not consulted', async () => {
+    const { logger } = buildLogger()
+
+    await forwardInboundMessage({
+      url: URL,
+      apiKey: '',
       phone: PHONE,
       message: buildTextMessage(),
       value: buildValue(),

@@ -37,7 +37,7 @@ const POST_TIMEOUT_MS = 3000
  */
 function toIsoOccurredAt(timestamp: string, logger: bp.Logger): string {
   const epochSeconds = Number(timestamp)
-  if (Number.isNaN(epochSeconds)) {
+  if (timestamp.trim() === '' || !Number.isFinite(epochSeconds)) {
     logger
       .forBot()
       .error(`Invalid WhatsApp message timestamp "${timestamp}" while forwarding to Darwin, using current time`)
