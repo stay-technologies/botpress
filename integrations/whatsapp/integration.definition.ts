@@ -720,6 +720,12 @@ export default new IntegrationDefinition({
     STATSIG_API_KEY: {
       description: 'Statsig server SDK key used to evaluate feature toggles (e.g. inbound forwarding to Darwin)',
     },
+    DARWIN_INBOUND_URL: {
+      description: 'Darwin inbound endpoint URL that receives forwarded WhatsApp messages',
+    },
+    DARWIN_API_KEY: {
+      description: 'Shared API key sent as the X-API-KEY header when forwarding inbound messages to Darwin',
+    },
   },
   entities: {
     proactiveConversation: {
