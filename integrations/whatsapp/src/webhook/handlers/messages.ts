@@ -5,6 +5,7 @@ import axios from 'axios'
 import { INTEGRATION_NAME, INTEGRATION_VERSION } from 'integration.definition'
 import { getAccessToken, getAuthenticatedWhatsappClient } from '../../auth'
 import { extractContactIdentifiers } from '../../misc/bsuid-extraction'
+import { forwardInboundMessage } from '../../misc/darwin-inbound-forwarding'
 import { buildConversationTags } from '../../misc/identifier-decision'
 import { safeFormatPhoneNumber } from '../../misc/phone-number-to-whatsapp'
 import { WhatsAppMessage, WhatsAppMessageValue } from '../../misc/types'
@@ -129,6 +130,18 @@ export const messagesHandler = async (
       ...(replyTo && { replyTo }),
       ..._processReferralTags(message, logger),
     },
+  })
+
+  // Best-effort: forward the inbound message to Darwin AFTER bot processing so it never
+  // adds latency or risk before delivery. Gated by secrets + Statsig; failures are swallowed.
+  await forwardInboundMessage({
+    url: bp.secrets.DARWIN_INBOUND_URL,
+    apiKey: bp.secrets.DARWIN_API_KEY,
+    phone: phone ?? '',
+    message,
+    value,
+    contact,
+    logger,
   })
 }
 
