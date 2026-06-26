@@ -1,25 +1,8 @@
-import statsig from 'statsig-node'
 import * as bp from '.botpress'
+import { isGateEnabled } from './statsig'
 
 export const INBOUND_FORWARDING_GATE = 'botpress-whatsapp-events-forwarding'
 
-let initialized = false
-
 export async function isInboundForwardingEnabled(phone: string, logger: bp.Logger): Promise<boolean> {
-  const apiKey = bp.secrets.STATSIG_API_KEY
-  if (!apiKey) {
-    return false
-  }
-
-  try {
-    if (!initialized) {
-      await statsig.initialize(apiKey)
-      initialized = true
-    }
-    return statsig.checkGateSync({ userID: phone }, INBOUND_FORWARDING_GATE)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    logger.forBot().error(`Failed to evaluate inbound forwarding feature toggle: ${message}`)
-    return false
-  }
+  return isGateEnabled(INBOUND_FORWARDING_GATE, phone, logger)
 }
