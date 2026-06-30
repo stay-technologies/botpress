@@ -142,6 +142,7 @@ describe('buildInboundEnvelope', () => {
           wamid: 'wamid.TEXT',
           occurredAt: '2021-01-01T00:00:00.000Z',
           type: 'text',
+          direction: 'INBOUND',
           content: { body: 'hello world' },
           text: 'hello world',
           sender: {

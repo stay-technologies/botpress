@@ -112,6 +112,7 @@ export function buildInboundEnvelope(
         wamid: message.id,
         occurredAt: toIsoOccurredAt(message.timestamp, logger),
         type: message.type,
+        direction: 'INBOUND',
         content,
         ...(text !== undefined && { text }),
         sender: {
