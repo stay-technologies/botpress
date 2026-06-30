@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { describe, test, expect, beforeEach, vi } from 'vitest'
-import { buildInboundEnvelope, forwardInboundMessage } from './darwin-inbound-forwarding'
-import { WhatsAppMessageValue } from './types'
+import { buildInboundEnvelope, buildOutboundEnvelope, buildStatusEnvelope, forwardInboundMessage } from './darwin-inbound-forwarding'
+import { WhatsAppEchoMessage, WhatsAppMessageEchoValue, WhatsAppMessageValue, WhatsAppStatusValue } from './types'
 
 vi.mock('axios', () => ({
   default: {
@@ -71,6 +71,57 @@ function buildContact(overrides: Partial<AnyContact> = {}): AnyContact {
     profile: { name: NAME },
     ...overrides,
   } as AnyContact
+}
+
+function buildEchoValue(): WhatsAppMessageEchoValue {
+  return {
+    messaging_product: 'whatsapp',
+    metadata: {
+      display_phone_number: '15550001111',
+      phone_number_id: 'phone-number-id-1',
+    },
+    message_echoes: [],
+  } as WhatsAppMessageEchoValue
+}
+
+function buildTextEcho(overrides: Partial<Record<string, unknown>> = {}): WhatsAppEchoMessage {
+  return {
+    from: '15550001111',
+    to: PHONE,
+    id: 'wamid.ECHO_TEXT',
+    timestamp: TIMESTAMP,
+    type: 'text',
+    text: { body: 'hello back' },
+    message_creation_type: 'agent',
+    ...overrides,
+  } as WhatsAppEchoMessage
+}
+
+function buildImageEcho(): WhatsAppEchoMessage {
+  return {
+    from: '15550001111',
+    to: PHONE,
+    id: 'wamid.ECHO_IMAGE',
+    timestamp: TIMESTAMP,
+    type: 'image',
+    image: { id: 'media-1', sha256: 'abc', mime_type: 'image/jpeg', caption: 'a pic' },
+    message_creation_type: 'agent',
+  } as WhatsAppEchoMessage
+}
+
+function buildStatus(overrides: Partial<WhatsAppStatusValue> = {}): WhatsAppStatusValue {
+  return {
+    id: 'wamid.STATUS',
+    status: 'delivered',
+    timestamp: TIMESTAMP,
+    recipient_id: PHONE,
+    ...overrides,
+  } as WhatsAppStatusValue
+}
+
+const METADATA = {
+  display_phone_number: '15550001111',
+  phone_number_id: 'phone-number-id-1',
 }
 
 describe('buildInboundEnvelope', () => {
@@ -214,6 +265,154 @@ describe('buildInboundEnvelope', () => {
     const envelope = buildInboundEnvelope(buildTextMessage(), buildValue(), undefined, logger as never)
 
     expect(envelope.events[0]!.sender).toEqual({ phone: null, bsuid: null, name: null })
+  })
+})
+
+describe('buildOutboundEnvelope', () => {
+  test('builds the exact contract shape for a text echo with direction OUTBOUND', () => {
+    const { logger } = buildLogger()
+    const echo = buildTextEcho({ context: { id: 'wamid.REPLIED' } })
+
+    const envelope = buildOutboundEnvelope(echo, buildEchoValue(), logger as never)
+
+    expect(envelope).toEqual({
+      source: 'whatsapp',
+      bot: {
+        phoneNumberId: 'phone-number-id-1',
+        displayPhoneNumber: '15550001111',
+      },
+      events: [
+        {
+          wamid: 'wamid.ECHO_TEXT',
+          occurredAt: '2021-01-01T00:00:00.000Z',
+          type: 'text',
+          direction: 'OUTBOUND',
+          content: { body: 'hello back' },
+          text: 'hello back',
+          sender: {
+            phone: PHONE,
+            bsuid: null,
+            name: null,
+          },
+          replyToWamid: 'wamid.REPLIED',
+        },
+      ],
+    })
+  })
+
+  test('direction is OUTBOUND and sender.phone = echo.to (recipient), bsuid/name null', () => {
+    const { logger } = buildLogger()
+
+    const envelope = buildOutboundEnvelope(buildTextEcho(), buildEchoValue(), logger as never)
+
+    expect(envelope.events[0]!.direction).toBe('OUTBOUND')
+    expect(envelope.events[0]!.sender).toEqual({ phone: PHONE, bsuid: null, name: null })
+  })
+
+  test('text echo: text = echo.text.body and content = raw text sub-object', () => {
+    const { logger } = buildLogger()
+
+    const envelope = buildOutboundEnvelope(buildTextEcho(), buildEchoValue(), logger as never)
+
+    expect(envelope.events[0]!.text).toBe('hello back')
+    expect(envelope.events[0]!.content).toEqual({ body: 'hello back' })
+  })
+
+  test('non-text echo: text is absent and content = raw per-type sub-object', () => {
+    const { logger } = buildLogger()
+
+    const envelope = buildOutboundEnvelope(buildImageEcho(), buildEchoValue(), logger as never)
+
+    expect(envelope.events[0]!.type).toBe('image')
+    expect('text' in envelope.events[0]!).toBe(false)
+    expect(envelope.events[0]!.content).toEqual({
+      id: 'media-1',
+      sha256: 'abc',
+      mime_type: 'image/jpeg',
+      caption: 'a pic',
+    })
+  })
+
+  test('replyToWamid is echo.context?.id; null when absent', () => {
+    const { logger } = buildLogger()
+
+    const noContext = buildOutboundEnvelope(buildTextEcho(), buildEchoValue(), logger as never)
+    expect(noContext.events[0]!.replyToWamid).toBeNull()
+
+    const withContext = buildOutboundEnvelope(
+      buildTextEcho({ context: { id: 'wamid.META' } }),
+      buildEchoValue(),
+      logger as never
+    )
+    expect(withContext.events[0]!.replyToWamid).toBe('wamid.META')
+  })
+
+  test('occurredAt is ISO-8601 UTC derived from the epoch-seconds string', () => {
+    const { logger } = buildLogger()
+    const echo = buildTextEcho({ timestamp: '1700000000' })
+
+    const envelope = buildOutboundEnvelope(echo, buildEchoValue(), logger as never)
+
+    expect(envelope.events[0]!.occurredAt).toBe(new Date(1700000000 * 1000).toISOString())
+  })
+
+  test('bot is taken from the echo value metadata', () => {
+    const { logger } = buildLogger()
+
+    const envelope = buildOutboundEnvelope(buildTextEcho(), buildEchoValue(), logger as never)
+
+    expect(envelope.bot).toEqual({ phoneNumberId: 'phone-number-id-1', displayPhoneNumber: '15550001111' })
+  })
+})
+
+describe('buildStatusEnvelope', () => {
+  test('builds the exact contract shape for a delivery status', () => {
+    const { logger } = buildLogger()
+
+    const envelope = buildStatusEnvelope(buildStatus(), METADATA, logger as never)
+
+    expect(envelope).toEqual({
+      source: 'whatsapp',
+      bot: {
+        phoneNumberId: 'phone-number-id-1',
+        displayPhoneNumber: '15550001111',
+      },
+      events: [
+        {
+          kind: 'status',
+          wamid: 'wamid.STATUS',
+          occurredAt: '2021-01-01T00:00:00.000Z',
+          status: 'delivered',
+        },
+      ],
+    })
+  })
+
+  test('event kind is "status" and carries wamid + status value', () => {
+    const { logger } = buildLogger()
+
+    const envelope = buildStatusEnvelope(buildStatus({ status: 'read', id: 'wamid.READ' }), METADATA, logger as never)
+
+    const event = envelope.events[0]!
+    expect('kind' in event && event.kind).toBe('status')
+    expect(event.wamid).toBe('wamid.READ')
+    expect('status' in event && event.status).toBe('read')
+  })
+
+  test('occurredAt is ISO-8601 UTC derived from the epoch-seconds string', () => {
+    const { logger } = buildLogger()
+
+    const envelope = buildStatusEnvelope(buildStatus({ timestamp: '1700000000' }), METADATA, logger as never)
+
+    expect(envelope.events[0]!.occurredAt).toBe(new Date(1700000000 * 1000).toISOString())
+  })
+
+  test('bot is taken from the provided metadata', () => {
+    const { logger } = buildLogger()
+
+    const envelope = buildStatusEnvelope(buildStatus(), METADATA, logger as never)
+
+    expect(envelope.bot).toEqual({ phoneNumberId: 'phone-number-id-1', displayPhoneNumber: '15550001111' })
   })
 })
 
