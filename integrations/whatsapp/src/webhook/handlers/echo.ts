@@ -1,3 +1,4 @@
+import { forwardOutboundMessage } from '../../misc/darwin-inbound-forwarding'
 import { safeFormatPhoneNumber } from '../../misc/phone-number-to-whatsapp'
 import { WhatsAppMessageEchoValue, WhatsAppEchoMessage } from '../../misc/types'
 import { _handleMessage } from './messages'
@@ -66,4 +67,14 @@ export const echoHandler = async (
       payload: {},
     })
   }
+
+  // Best-effort forwarding to Darwin, AFTER bot processing — never throws into the hot path.
+  await forwardOutboundMessage({
+    url: bp.secrets.DARWIN_INBOUND_URL,
+    apiKey: bp.secrets.DARWIN_API_KEY,
+    phone: echo.to,
+    echo,
+    value,
+    logger,
+  })
 }

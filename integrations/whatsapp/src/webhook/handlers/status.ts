@@ -1,7 +1,8 @@
 import { getAuthenticatedWhatsappClient } from 'src/auth'
 import { getMessageFromWhatsappMessageId } from 'src/misc/util'
 import { Text } from 'whatsapp-api-js/messages'
-import { WhatsAppStatusValue } from '../../misc/types'
+import { forwardStatus } from '../../misc/darwin-inbound-forwarding'
+import { WhatsAppMessageValue, WhatsAppStatusValue } from '../../misc/types'
 import * as bp from '.botpress'
 
 // Meta error codes for which a plain-text URL fallback is useful.
@@ -41,8 +42,24 @@ const _getMediaUrlFromPayload = (
   }
 }
 
-export const statusHandler = async (value: WhatsAppStatusValue, props: bp.HandlerProps) => {
+export const statusHandler = async (
+  value: WhatsAppStatusValue,
+  messageValue: WhatsAppMessageValue,
+  props: bp.HandlerProps
+) => {
   const { client, ctx, logger } = props
+
+  // Best-effort forwarding to Darwin runs regardless of whether Botpress has a
+  // local message for this wamid: Darwin correlates by its own wamid store and
+  // gracefully discards unknown ones, so it must not be gated by the lookup below.
+  await forwardStatus({
+    url: bp.secrets.DARWIN_INBOUND_URL,
+    apiKey: bp.secrets.DARWIN_API_KEY,
+    phone: value.recipient_id,
+    status: value,
+    metadata: messageValue.metadata,
+    logger,
+  })
 
   const message = await getMessageFromWhatsappMessageId(value.id, client)
   if (!message) {

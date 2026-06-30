@@ -77,7 +77,7 @@ const _handler: bp.IntegrationProps['handler'] = async (props: bp.HandlerProps) 
       }
       for (const status of changes.value.statuses ?? []) {
         try {
-          await statusHandler(status, props)
+          await statusHandler(status, changes.value, props)
         } catch (thrown: unknown) {
           const errMsg = thrown instanceof Error ? thrown.message : 'Unknown error thrown'
           logger.forBot().error(`Failed to process WhatsApp status event: ${errMsg}`)
