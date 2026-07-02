@@ -1,6 +1,7 @@
 import { RuntimeError, z } from '@botpress/sdk'
 import { getDefaultBotPhoneNumberId, getAuthenticatedWhatsappClient } from '../auth'
 import { Interactive, Body, ActionFlow } from 'whatsapp-api-js/messages'
+import { forwardSentMessage } from '../misc/darwin-inbound-forwarding'
 import { buildConversationTags, chooseSendRecipient } from '../misc/identifier-decision'
 import * as bp from '.botpress'
 
@@ -111,6 +112,22 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
       }" and action "${parameters.flow_action}" - Error: ${errorJSON}`,
       logger
     )
+  }
+
+  const wamid = 'messages' in response ? response.messages[0]?.id : undefined
+  if (wamid) {
+    // Best-effort forwarding to Darwin — never throws into the action path.
+    await forwardSentMessage({
+      url: bp.secrets.DARWIN_INBOUND_URL,
+      apiKey: bp.secrets.DARWIN_API_KEY,
+      wamid,
+      messageType: 'interactive',
+      message: interactive,
+      recipientPhone: userPhone,
+      recipientBsuid: userBsuid,
+      botPhoneNumberId,
+      logger,
+    })
   }
 
   logger

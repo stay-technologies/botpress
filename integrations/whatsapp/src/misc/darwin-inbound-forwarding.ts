@@ -9,7 +9,8 @@ type InboundContact = NonNullable<WhatsAppMessageValue['contacts']>[number]
 
 type BotMetadata = {
   phoneNumberId: string
-  displayPhoneNumber: string
+  // Optional in Darwin's DTO; unavailable at the send path (only webhook metadata carries it).
+  displayPhoneNumber?: string
 }
 
 type MessageEvent = {
@@ -164,6 +165,62 @@ export function buildOutboundEnvelope(
   }
 }
 
+export type SentMessageParams = {
+  wamid: string
+  /** Meta message type as exposed by whatsapp-api-js (`message._type`), e.g. 'text', 'image', 'template'. */
+  messageType: string
+  /** The whatsapp-api-js ClientMessage instance passed to `whatsapp.sendMessage`. */
+  message: unknown
+  recipientPhone: string | undefined
+  recipientBsuid: string | undefined
+  botPhoneNumberId: string
+  logger: bp.Logger
+}
+
+/**
+ * Pure builder: turns a just-sent Cloud API message into the Darwin contract envelope.
+ * whatsapp-api-js message classes JSON-serialize to the exact per-type sub-object the
+ * Meta API receives, matching the `content` shape of the inbound/echo builders.
+ * `sender` carries the RECIPIENT for outbound. Never throws.
+ */
+export function buildSentMessageEnvelope(params: SentMessageParams): DarwinEnvelope {
+  const { wamid, messageType, message, recipientPhone, recipientBsuid, botPhoneNumberId, logger } = params
+
+  let content: unknown = null
+  try {
+    content = JSON.parse(JSON.stringify(message))
+  } catch (thrown: unknown) {
+    const errMsg = thrown instanceof Error ? thrown.message : 'Unknown error thrown'
+    logger.forBot().error(`Failed to serialize sent ${messageType} message while forwarding to Darwin: ${errMsg}`)
+  }
+
+  const body = (content as Record<string, unknown> | null)?.body
+  const text = messageType === 'text' && typeof body === 'string' ? body : undefined
+
+  return {
+    source: 'whatsapp',
+    bot: {
+      phoneNumberId: botPhoneNumberId,
+    },
+    events: [
+      {
+        wamid,
+        occurredAt: new Date().toISOString(),
+        type: messageType,
+        direction: 'OUTBOUND',
+        content,
+        ...(text !== undefined && { text }),
+        sender: {
+          phone: recipientPhone ?? null,
+          bsuid: recipientBsuid ?? null,
+          name: null,
+        },
+        replyToWamid: null,
+      },
+    ],
+  }
+}
+
 /**
  * Pure builder: turns a single WhatsApp delivery status into the Darwin contract envelope.
  */
@@ -245,6 +302,37 @@ export async function forwardOutboundMessage(params: ForwardOutboundMessageParam
 
   const envelope = buildOutboundEnvelope(echo, value, logger)
   await postEnvelope(url, apiKey, envelope, logger, 'outbound WhatsApp message')
+}
+
+export type ForwardSentMessageParams = SentMessageParams & {
+  url: string | undefined
+  apiKey: string | undefined
+}
+
+/**
+ * Best-effort forwarder for messages just sent through the Cloud API. Same gating as the
+ * other forwarders. Cloud API sends never generate `smb_message_echoes` webhooks (echoes
+ * only cover WhatsApp Business App coexistence), so this is the only path that gets
+ * bot-sent messages to Darwin.
+ */
+export async function forwardSentMessage(params: ForwardSentMessageParams): Promise<void> {
+  const { url, apiKey, recipientPhone, recipientBsuid, logger } = params
+
+  if (!url || !apiKey) {
+    return
+  }
+
+  const gateKey = recipientPhone ?? recipientBsuid
+  if (!gateKey) {
+    return
+  }
+
+  if (!(await isInboundForwardingEnabled(gateKey, logger))) {
+    return
+  }
+
+  const envelope = buildSentMessageEnvelope(params)
+  await postEnvelope(url, apiKey, envelope, logger, 'sent WhatsApp message')
 }
 
 export type ForwardStatusParams = {
