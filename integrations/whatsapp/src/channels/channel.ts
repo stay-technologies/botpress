@@ -16,6 +16,7 @@ import {
 import { getAuthenticatedWhatsappClient } from '../auth'
 import { WHATSAPP } from '../misc/constants'
 import { forwardSentMessage } from '../misc/darwin-inbound-forwarding'
+import { getDarwinForwardingSecrets } from '../misc/darwin-forwarding-secrets'
 import { chooseSendRecipient, MissingWhatsAppRecipientError, type SendRecipient } from '../misc/identifier-decision'
 import { convertMarkdownToWhatsApp } from '../misc/markdown-to-whatsapp-rtf'
 import { splitTextMessageIfNeeded } from '../misc/split-text-message'
@@ -349,8 +350,7 @@ async function _send({ client, ctx, conversation, logger, message, ack }: SendMe
   // Best-effort forwarding to Darwin, AFTER ack — never throws into the send path.
   // Cloud API sends do not generate echo webhooks, so this is the only outbound signal.
   await forwardSentMessage({
-    url: bp.secrets.DARWIN_INBOUND_URL,
-    apiKey: bp.secrets.DARWIN_API_KEY,
+    ...getDarwinForwardingSecrets(),
     wamid,
     messageType,
     message,

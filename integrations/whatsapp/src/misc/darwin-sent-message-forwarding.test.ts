@@ -62,7 +62,9 @@ describe('buildSentMessageEnvelope', () => {
       text: 'hello world',
       replyToWamid: null,
     })
-    expect('content' in event && event.content).not.toHaveProperty('_type')
+    const content = 'content' in event ? event.content : undefined
+    expect(content).toBeDefined()
+    expect(content).not.toHaveProperty('_type')
   })
 
   test('emits a valid ISO-8601 occurredAt', () => {
@@ -73,6 +75,12 @@ describe('buildSentMessageEnvelope', () => {
 
   test('sender carries the recipient phone when only phone is available', () => {
     const envelope = buildSentMessageEnvelope(buildParams({ recipientPhone: PHONE, recipientBsuid: undefined }))
+    const event = envelope.events[0]!
+    expect('sender' in event && event.sender).toEqual({ phone: PHONE, bsuid: null, name: null })
+  })
+
+  test('normalizes E.164 phone to the bare wa_id format used by the inbound path', () => {
+    const envelope = buildSentMessageEnvelope(buildParams({ recipientPhone: `+${PHONE}`, recipientBsuid: undefined }))
     const event = envelope.events[0]!
     expect('sender' in event && event.sender).toEqual({ phone: PHONE, bsuid: null, name: null })
   })
@@ -183,6 +191,32 @@ describe('forwardSentMessage', () => {
       apiKey: API_KEY,
     })
     expect(isInboundForwardingEnabled).toHaveBeenCalledWith(PHONE, expect.anything())
+  })
+
+  test('consults the gate with the normalized wa_id format when the phone is E.164', async () => {
+    isInboundForwardingEnabled.mockResolvedValue(true)
+    await forwardSentMessage({
+      ...buildParams({ recipientPhone: `+${PHONE}`, recipientBsuid: undefined }),
+      url: URL,
+      apiKey: API_KEY,
+    })
+    expect(isInboundForwardingEnabled).toHaveBeenCalledWith(PHONE, expect.anything())
+  })
+
+  test('never rejects when the gate check itself throws (send path never breaks)', async () => {
+    const { logger, error } = buildLogger()
+    isInboundForwardingEnabled.mockRejectedValue(new Error('statsig exploded'))
+
+    await expect(
+      forwardSentMessage({
+        ...buildParams({ logger: logger as never }),
+        url: URL,
+        apiKey: API_KEY,
+      })
+    ).resolves.toBeUndefined()
+
+    expect(mockedAxiosPost).not.toHaveBeenCalled()
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('statsig exploded'))
   })
 
   test('consults the gate with the bsuid when phone is missing', async () => {
