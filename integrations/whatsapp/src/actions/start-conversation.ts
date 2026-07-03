@@ -3,6 +3,8 @@ import { INTEGRATION_NAME, INTEGRATION_VERSION } from 'integration.definition'
 import { Language, Template } from 'whatsapp-api-js/messages'
 import type { TemplateComponent } from 'whatsapp-api-js/types'
 import { getDefaultBotPhoneNumberId, getAuthenticatedWhatsappClient } from '../auth'
+import { forwardSentMessage } from '../misc/darwin-inbound-forwarding'
+import { getDarwinForwardingSecrets } from '../misc/darwin-forwarding-secrets'
 import { buildConversationTags, chooseSendRecipient } from '../misc/identifier-decision'
 import { safeFormatPhoneNumber } from '../misc/phone-number-to-whatsapp'
 import {
@@ -156,6 +158,20 @@ export const startConversation: bp.IntegrationProps['actions']['startConversatio
       const message = err instanceof Error ? err.message : ''
       logger.forBot().error(`Failed to Create synthetic message from template message - Error: ${message}`)
     })
+
+  if (whatsappMessageId) {
+    // Best-effort forwarding to Darwin — never throws into the action path.
+    await forwardSentMessage({
+      ...getDarwinForwardingSecrets(),
+      wamid: whatsappMessageId,
+      messageType: 'template',
+      message: template,
+      recipientPhone: formattedPhone,
+      recipientBsuid: userBsuid,
+      botPhoneNumberId,
+      logger,
+    })
+  }
 
   logger
     .forBot()

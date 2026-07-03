@@ -15,6 +15,8 @@ import {
 } from 'whatsapp-api-js/messages'
 import { getAuthenticatedWhatsappClient } from '../auth'
 import { WHATSAPP } from '../misc/constants'
+import { forwardSentMessage } from '../misc/darwin-inbound-forwarding'
+import { getDarwinForwardingSecrets } from '../misc/darwin-forwarding-secrets'
 import { chooseSendRecipient, MissingWhatsAppRecipientError, type SendRecipient } from '../misc/identifier-decision'
 import { convertMarkdownToWhatsApp } from '../misc/markdown-to-whatsapp-rtf'
 import { splitTextMessageIfNeeded } from '../misc/split-text-message'
@@ -342,7 +344,21 @@ async function _send({ client, ctx, conversation, logger, message, ack }: SendMe
   }
 
   logger.forBot().debug(`Successfully sent ${messageType} message from bot to WhatsApp:`, message)
-  await ack({ tags: { id: feedback.messages[0].id } })
+  const wamid = feedback.messages[0].id
+  await ack({ tags: { id: wamid } })
+
+  // Best-effort forwarding to Darwin, AFTER ack — never throws into the send path.
+  // Cloud API sends do not generate echo webhooks, so this is the only outbound signal.
+  await forwardSentMessage({
+    ...getDarwinForwardingSecrets(),
+    wamid,
+    messageType,
+    message,
+    recipientPhone: conversation.tags.userPhone,
+    recipientBsuid: conversation.tags.bsuid,
+    botPhoneNumberId,
+    logger,
+  })
 }
 
 async function _sendMany({

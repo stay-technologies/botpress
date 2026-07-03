@@ -1,6 +1,8 @@
 import { RuntimeError, z } from '@botpress/sdk'
 import { getDefaultBotPhoneNumberId, getAuthenticatedWhatsappClient } from '../auth'
 import { Interactive, Body, ActionFlow } from 'whatsapp-api-js/messages'
+import { forwardSentMessage } from '../misc/darwin-inbound-forwarding'
+import { getDarwinForwardingSecrets } from '../misc/darwin-forwarding-secrets'
 import { buildConversationTags, chooseSendRecipient } from '../misc/identifier-decision'
 import * as bp from '.botpress'
 
@@ -113,6 +115,21 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
     )
   }
 
+  const wamid = 'messages' in response ? response.messages[0]?.id : undefined
+  if (wamid) {
+    // Best-effort forwarding to Darwin — never throws into the action path.
+    await forwardSentMessage({
+      ...getDarwinForwardingSecrets(),
+      wamid,
+      messageType: 'interactive',
+      message: _redactFlowSensitiveFields(interactive),
+      recipientPhone: userPhone,
+      recipientBsuid: userBsuid,
+      botPhoneNumberId,
+      logger,
+    })
+  }
+
   logger
     .forBot()
     .info(
@@ -129,4 +146,27 @@ export const startFlow = async ({ ctx, input, client, logger }: any) => {
 function _logForBotAndThrow(message: string, logger: any): never {
   logger.forBot().error(message)
   throw new RuntimeError(message)
+}
+
+/**
+ * The serialized Interactive carries `action.parameters.flow_token` (session/authorization
+ * token validated by the flow's data endpoint) and `flow_action_payload.data` (arbitrary
+ * initial screen data, potentially PII). Neither belongs in the Darwin envelope — Meta
+ * never echoes them either. Returns a redacted plain-object copy; on any failure returns
+ * a minimal marker object so forwarding stays best-effort.
+ */
+function _redactFlowSensitiveFields(interactive: Interactive): unknown {
+  try {
+    const plain = JSON.parse(JSON.stringify(interactive))
+    const parameters = plain?.action?.parameters
+    if (parameters && typeof parameters === 'object') {
+      delete parameters.flow_token
+      if (parameters.flow_action_payload && typeof parameters.flow_action_payload === 'object') {
+        delete parameters.flow_action_payload.data
+      }
+    }
+    return plain
+  } catch {
+    return { type: 'flow' }
+  }
 }
