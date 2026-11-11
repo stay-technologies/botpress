@@ -33,6 +33,17 @@ type StatusEvent = {
   wamid: string
   occurredAt: string
   status: 'sent' | 'delivered' | 'read' | 'failed'
+  errors?: DeliveryFailureError[]
+}
+
+type DeliveryFailureError = {
+  code: number
+  title: string
+}
+
+// Darwin answers 400 to the whole envelope on any extra field of an error item, losing the failed status.
+function toDeliveryFailureErrors(errors: WhatsAppStatusValue['errors']): DeliveryFailureError[] | undefined {
+  return errors?.map(({ code, title }) => ({ code, title }))
 }
 
 export type DarwinEnvelope = {
@@ -243,6 +254,7 @@ export function buildStatusEnvelope(
   metadata: { phone_number_id: string; display_phone_number: string },
   logger: bp.Logger
 ): DarwinEnvelope {
+  const errors = toDeliveryFailureErrors(status.errors)
   return {
     source: 'whatsapp',
     bot: {
@@ -255,6 +267,7 @@ export function buildStatusEnvelope(
         wamid: status.id,
         occurredAt: toIsoOccurredAt(status.timestamp, logger),
         status: status.status,
+        ...(errors ? { errors } : {}),
       },
     ],
   }
