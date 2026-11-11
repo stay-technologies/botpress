@@ -1,0 +1,22 @@
+name: Stay WhatsApp Checks
+
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  stay-whatsapp-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: '--max_old_space_size=8192'
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          extra_filters: '-F @stay/whatsapp-stay'
+      - run: pnpm -F @stay/whatsapp-stay run check:type
+      - run: pnpm -F @stay/whatsapp-stay run check:bplint
+      - run: pnpm -F @stay/whatsapp-stay run test
