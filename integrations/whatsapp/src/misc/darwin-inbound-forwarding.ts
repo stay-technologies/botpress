@@ -254,7 +254,6 @@ export function buildStatusEnvelope(
   metadata: { phone_number_id: string; display_phone_number: string },
   logger: bp.Logger
 ): DarwinEnvelope {
-  const errors = toDeliveryFailureErrors(status.errors)
   return {
     source: 'whatsapp',
     bot: {
@@ -267,7 +266,7 @@ export function buildStatusEnvelope(
         wamid: status.id,
         occurredAt: toIsoOccurredAt(status.timestamp, logger),
         status: status.status,
-        ...(errors ? { errors } : {}),
+        errors: toDeliveryFailureErrors(status.errors),
       },
     ],
   }

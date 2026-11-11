@@ -445,12 +445,17 @@ describe('buildStatusEnvelope', () => {
     })
   })
 
-  test('failed status without Meta errors omits the errors field', () => {
+  test('failed status without Meta errors posts no errors field', () => {
     const { logger } = buildLogger()
 
     const envelope = buildStatusEnvelope(buildStatus({ status: 'failed' }), METADATA, logger as never)
 
-    expect('errors' in envelope.events[0]!).toBe(false)
+    expect(JSON.parse(JSON.stringify(envelope)).events[0]).toStrictEqual({
+      kind: 'status',
+      wamid: 'wamid.STATUS',
+      occurredAt: '2021-01-01T00:00:00.000Z',
+      status: 'failed',
+    })
   })
 })
 
