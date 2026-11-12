@@ -46,10 +46,10 @@ function toDeliveryFailureErrors(errors: WhatsAppStatusValue['errors']): Deliver
   return errors?.map(({ code, title }) => ({ code, title }))
 }
 
-export type DarwinEnvelope = {
+export type DarwinEnvelope<TEvent extends MessageEvent | StatusEvent = MessageEvent | StatusEvent> = {
   source: 'whatsapp'
   bot: BotMetadata
-  events: Array<MessageEvent | StatusEvent>
+  events: TEvent[]
 }
 
 // Kept as an alias for backwards compatibility with existing inbound call sites/tests.
@@ -121,7 +121,7 @@ export function buildInboundEnvelope(
   value: WhatsAppMessageValue,
   contact: InboundContact | undefined,
   logger: bp.Logger
-): DarwinEnvelope {
+): DarwinEnvelope<MessageEvent> {
   const { bsuid, phone } = contact ? extractContactIdentifiers(contact) : { bsuid: undefined, phone: undefined }
 
   const content = (message as Record<string, unknown>)[message.type]
@@ -161,7 +161,7 @@ export function buildOutboundEnvelope(
   echo: WhatsAppEchoMessage,
   value: WhatsAppMessageEchoValue,
   logger: bp.Logger
-): DarwinEnvelope {
+): DarwinEnvelope<MessageEvent> {
   const content = (echo as Record<string, unknown>)[echo.type]
   const text = echo.type === 'text' ? echo.text.body : undefined
 
@@ -208,7 +208,7 @@ export type SentMessageParams = {
  * Meta API receives, matching the `content` shape of the inbound/echo builders.
  * `sender` carries the RECIPIENT for outbound. Never throws.
  */
-export function buildSentMessageEnvelope(params: SentMessageParams): DarwinEnvelope {
+export function buildSentMessageEnvelope(params: SentMessageParams): DarwinEnvelope<MessageEvent> {
   const { wamid, messageType, message, recipientPhone, recipientBsuid, botPhoneNumberId, logger } = params
 
   let content: unknown = null
@@ -253,7 +253,7 @@ export function buildStatusEnvelope(
   status: WhatsAppStatusValue,
   metadata: { phone_number_id: string; display_phone_number: string },
   logger: bp.Logger
-): DarwinEnvelope {
+): DarwinEnvelope<StatusEvent> {
   return {
     source: 'whatsapp',
     bot: {
