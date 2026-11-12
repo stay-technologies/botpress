@@ -1,6 +1,8 @@
 import { Request } from '@botpress/sdk'
 import * as crypto from 'crypto'
 import { getClientSecret } from '../auth'
+import { getHandoffApiKey } from '../misc/darwin-forwarding-secrets'
+import { handoffHandler, HANDOFF_PATH } from '../misc/darwin-handoff'
 import { WhatsAppPayload, WhatsAppPayloadSchema } from '../misc/types'
 import { echoHandler } from './handlers/echo'
 import { messagesHandler } from './handlers/messages'
@@ -15,6 +17,10 @@ const _handler: bp.IntegrationProps['handler'] = async (props: bp.HandlerProps) 
   const { req, logger, client } = props
   if (req.path.startsWith('/oauth')) {
     return await oauthCallbackHandler(props)
+  }
+
+  if (req.path === HANDOFF_PATH) {
+    return await handoffHandler({ req, client, logger, apiKey: getHandoffApiKey() })
   }
 
   if (isSandboxCommand(props)) {

@@ -10,6 +10,7 @@ Doc de referência do [CLAUDE.md](../CLAUDE.md) — features de produto (Flows, 
 | WhatsApp Flows (`startFlow`) | [`src/actions/start-flow.ts`](../src/actions/start-flow.ts) | FOU-* |
 | Identidade por BSUID | [`src/misc/bsuid-extraction.ts`](../src/misc/bsuid-extraction.ts), [`src/misc/identifier-decision.ts`](../src/misc/identifier-decision.ts) | FOU-320/328/339 |
 | Forwarding p/ Darwin | [`src/misc/darwin-inbound-forwarding.ts`](../src/misc/darwin-inbound-forwarding.ts) | FOU-541/530 |
+| Handoff de conversa com o Darwin | [`src/misc/darwin-handoff.ts`](../src/misc/darwin-handoff.ts) | FOU-1287 |
 | Feature toggle (Statsig) | [`src/misc/feature-toggle.ts`](../src/misc/feature-toggle.ts), [`src/misc/statsig.ts`](../src/misc/statsig.ts) | FOU-550 |
 
 ## Forwarding para o Darwin
@@ -30,6 +31,19 @@ Regras invioláveis do encaminhamento (ao mexer, **preserve**):
 - **Timestamp** convertido para ISO-8601 UTC (`toIsoOccurredAt`), com fallback para "agora" logado quando inválido.
 
 Secrets usados: `DARWIN_INBOUND_URL`, `DARWIN_API_KEY` (ver bloco `secrets` em [`integration.definition.ts`](../integration.definition.ts)).
+
+## Handoff de conversa com o Darwin
+
+Prova de conceito (FOU-1287): o Darwin assume uma conversa e a devolve. Contrato (tags, evento, rota e respostas) no [README §3](../README.md#3-handoff-de-conversa-com-o-darwin-fou-1287).
+
+- **Dono da conversa** — tag de conversa `handoffOwner` (`isDelegatedToDarwin` em [`darwin-handoff.ts`](../src/misc/darwin-handoff.ts)). Só o valor exato `darwin` desvia; tag ausente ou qualquer outro valor segue o caminho de sempre.
+- **Rota `POST /handoff`** — `handoffHandler`, plugado em [`src/webhook/handler.ts`](../src/webhook/handler.ts) antes da validação de assinatura da Meta (que não é tocada). Autenticação pelo header `x-api-key` contra o secret `HANDOFF_API_KEY`; sem o secret configurado a rota recusa tudo.
+- **Ordem tag → evento** — com `handoffResult`, primeiro `updateConversation` (as duas tags), depois `createEvent('handoffReturned')`. Não inverta: se o evento falhar, a conversa já voltou para o bot.
+- **Desvio** — em [`messages.ts`](../src/webhook/handlers/messages.ts), depois do `markAsRead` e do `getOrCreateConversation`: conversa delegada não chama `_handleMessage` nem cria usuário/mensagem no Botpress.
+- **Repasse da conversa delegada** — `forwardDelegatedInboundMessage`: aqui o Darwin é o **único** destinatário, então **não** é best-effort gated: ignora a flag do Statsig, tenta de novo uma vez e, persistindo a falha, registra erro com o `wamid`. Continua sem lançar.
+- **Relógio de inatividade** — o SDK não oferece um jeito de marcar a conversa como ativa sem entregar mensagem ou evento ao bot; nada foi implementado.
+
+Secret usado: `HANDOFF_API_KEY`.
 
 ## Feature toggle (Statsig)
 

@@ -34,6 +34,25 @@ Por que importa:
 - Conforme as regras de privacidade do Meta evoluem, nem todo evento traz o número do usuário em claro. O `bsuid` é o identificador canônico recomendado para essas situações.
 - Permite tratar o mesmo usuário consistentemente entre conversas/canais dentro do mesmo *business portfolio*.
 
+### 3. Handoff de conversa com o Darwin (FOU-1287)
+
+Permite que o Darwin assuma uma conversa de WhatsApp e a devolva ao bot, sem o usuário perceber. O dono da conversa é a tag de conversa `handoffOwner`.
+
+- **Tags de conversa**
+  - `handoffOwner`: `darwin` ou `botpress`. Ausente equivale a `botpress`. Troca de valor, nunca é apagada.
+  - `handoffResult`: `continue`, `error` (reservado) ou `none` (gravado pelo bot depois de consumir a instrução).
+- **Evento `handoffReturned`** — criado na conversa quando o Darwin a devolve; carrega `handoffResult`.
+- **Rota `POST /handoff`** — no webhook da integração (`https://webhook.botpress.cloud/<webhookId>/handoff`). Autenticada pelo header `x-api-key`, comparado com o secret `HANDOFF_API_KEY`. Corpo JSON:
+  ```json
+  { "conversationId": "<id da conversa no Botpress>", "handoffOwner": "darwin | botpress", "handoffResult": "continue | error (opcional)" }
+  ```
+  - Sem `handoffResult`: só grava `handoffOwner`.
+  - Com `handoffResult`: grava as duas tags e **depois** cria o evento `handoffReturned` (se o evento falhar, a conversa já voltou).
+  - Respostas: `200` ok; `401` chave ausente/inválida (sem efeito); `400` corpo inválido; `405` método diferente de POST; `500` falha ao gravar tag ou criar evento.
+- **Desvio** — com `handoffOwner = darwin`, a mensagem recebida é marcada como lida, repassada ao Darwin (sem consultar a flag do Statsig, com uma nova tentativa) e **não** é entregue ao bot. Conversas sem a tag, ou com outro valor, seguem como antes.
+
+Do lado do Darwin: `WHATSAPP_STAY_HANDOFF_URL` aponta para a rota e `WHATSAPP_STAY_HANDOFF_API_KEY` carrega o mesmo valor de `HANDOFF_API_KEY`.
+
 ---
 
 # Deploy de uma nova versão
@@ -197,7 +216,8 @@ bp deploy --dryRun --visibility private -y \
   --secrets SANDBOX_CLIENT_SECRET=placeholder \
   --secrets SANDBOX_VERIFY_TOKEN=placeholder \
   --secrets SANDBOX_ACCESS_TOKEN=placeholder \
-  --secrets SANDBOX_PHONE_NUMBER_ID=placeholder
+  --secrets SANDBOX_PHONE_NUMBER_ID=placeholder \
+  --secrets HANDOFF_API_KEY=placeholder
 ```
 
 Flags importantes:
@@ -225,8 +245,11 @@ bp deploy --visibility private -y \
   --secrets SANDBOX_CLIENT_SECRET=<valor-real> \
   --secrets SANDBOX_VERIFY_TOKEN=<valor-real> \
   --secrets SANDBOX_ACCESS_TOKEN=<valor-real> \
-  --secrets SANDBOX_PHONE_NUMBER_ID=<valor-real>
+  --secrets SANDBOX_PHONE_NUMBER_ID=<valor-real> \
+  --secrets HANDOFF_API_KEY=<valor-real>
 ```
+
+> `HANDOFF_API_KEY` (FOU-1287) é novo na v1.6.0: precisa ser informado no primeiro deploy dessa versão. É a chave que o Darwin envia no header `x-api-key` da rota `POST /handoff`.
 
 A CLI:
 1. Faz upload do bundle.

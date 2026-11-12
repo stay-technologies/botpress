@@ -24,3 +24,12 @@ export function getDarwinForwardingSecrets(): { url: string | undefined; apiKey:
   }
   return { url, apiKey }
 }
+
+/** Safe accessor for the POST /handoff route key (FOU-1287). Missing secret → undefined → route refuses. */
+export function getHandoffApiKey(): string | undefined {
+  try {
+    return bp.secrets.HANDOFF_API_KEY
+  } catch {
+    return undefined
+  }
+}

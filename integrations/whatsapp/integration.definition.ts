@@ -164,7 +164,7 @@ const defaultBotPhoneNumberId = {
 }
 
 export const INTEGRATION_NAME = 'whatsapp-stay'
-export const INTEGRATION_VERSION = '1.5.1'
+export const INTEGRATION_VERSION = '1.6.0'
 export default new IntegrationDefinition({
   name: INTEGRATION_NAME,
   version: INTEGRATION_VERSION,
@@ -369,6 +369,16 @@ export default new IntegrationDefinition({
             title: 'BSUID',
             description:
               "Business-Scoped User ID (Meta), format `{ISO 3166}.{alphanumeric}`. Used as the recipient when 'userPhone' is absent.",
+          },
+          handoffOwner: {
+            title: 'Handoff Owner',
+            description:
+              'Who owns the conversation: "darwin" (inbound messages are diverted to Darwin and never reach the bot) or "botpress". Absent means "botpress". The value changes, the tag is never deleted.',
+          },
+          handoffResult: {
+            title: 'Handoff Result',
+            description:
+              'Instruction left by Darwin when it returns the conversation: "continue", "error" (reserved) or "none" (written by the bot once the instruction is consumed).',
           },
         },
       },
@@ -662,6 +672,17 @@ export default new IntegrationDefinition({
         'Triggered when the category of a WhatsApp template is changed — whether manually or by an automated process, or when such a change is about to occur.',
       schema: WhatsAppTemplateCategoryUpdateValueSchema,
     },
+    handoffReturned: {
+      title: 'Handoff Returned',
+      description:
+        'Triggered when Darwin returns a delegated conversation to the bot (POST /handoff with a handoffResult)',
+      schema: z.object({
+        handoffResult: z
+          .enum(['continue', 'error'])
+          .title('Handoff Result')
+          .describe('What the bot should do with the returned conversation ("error" is reserved)'),
+      }),
+    },
   },
   states: {
     credentials: {
@@ -725,6 +746,9 @@ export default new IntegrationDefinition({
     },
     DARWIN_API_KEY: {
       description: 'Shared API key sent as the X-API-KEY header when forwarding inbound messages to Darwin',
+    },
+    HANDOFF_API_KEY: {
+      description: 'API key Darwin must send as the x-api-key header when calling the POST /handoff route',
     },
   },
   entities: {
