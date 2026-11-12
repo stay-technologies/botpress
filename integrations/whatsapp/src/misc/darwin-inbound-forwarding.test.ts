@@ -415,6 +415,48 @@ describe('buildStatusEnvelope', () => {
 
     expect(envelope.bot).toEqual({ phoneNumberId: 'phone-number-id-1', displayPhoneNumber: '15550001111' })
   })
+
+  test('failed status carries only code and title of each Meta error', () => {
+    const { logger } = buildLogger()
+    const status = buildStatus({
+      status: 'failed',
+      errors: [
+        {
+          code: 131026,
+          title: 'Message undeliverable',
+          message: 'Message undeliverable',
+          error_data: { details: 'Recipient is not a valid WhatsApp user' },
+        },
+        { code: 131049, title: 'Marketing limit reached', message: 'Marketing limit reached' },
+      ],
+    })
+
+    const envelope = buildStatusEnvelope(status, METADATA, logger as never)
+
+    expect(envelope.events[0]).toEqual({
+      kind: 'status',
+      wamid: 'wamid.STATUS',
+      occurredAt: '2021-01-01T00:00:00.000Z',
+      status: 'failed',
+      errors: [
+        { code: 131026, title: 'Message undeliverable' },
+        { code: 131049, title: 'Marketing limit reached' },
+      ],
+    })
+  })
+
+  test('failed status without Meta errors posts no errors field', () => {
+    const { logger } = buildLogger()
+
+    const envelope = buildStatusEnvelope(buildStatus({ status: 'failed' }), METADATA, logger as never)
+
+    expect(JSON.parse(JSON.stringify(envelope)).events[0]).toStrictEqual({
+      kind: 'status',
+      wamid: 'wamid.STATUS',
+      occurredAt: '2021-01-01T00:00:00.000Z',
+      status: 'failed',
+    })
+  })
 })
 
 describe('forwardInboundMessage', () => {

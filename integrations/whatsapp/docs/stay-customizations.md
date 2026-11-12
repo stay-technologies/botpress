@@ -28,6 +28,7 @@ Regras invioláveis do encaminhamento (ao mexer, **preserve**):
 - **Timeout curto** (`POST_TIMEOUT_MS = 3000`). Autenticação via header `X-API-KEY`.
 - **Mídia não é baixada** — `content` é o sub-objeto cru por tipo, exatamente como veio do Meta.
 - **Timestamp** convertido para ISO-8601 UTC (`toIsoOccurredAt`), com fallback para "agora" logado quando inválido.
+- **Motivo da falha de entrega** — o status `failed` leva o `errors[]` da Meta só com `code` e `title` por item. O Darwin responde 400 ao envelope inteiro se um item tiver outro campo, e o status se perde junto.
 
 Secrets usados: `DARWIN_INBOUND_URL`, `DARWIN_API_KEY` (ver bloco `secrets` em [`integration.definition.ts`](../integration.definition.ts)).
 
