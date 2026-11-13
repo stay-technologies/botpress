@@ -1,4 +1,5 @@
 import { Request, z } from '@botpress/sdk'
+import axios from 'axios'
 import * as crypto from 'crypto'
 import * as bp from '.botpress'
 
@@ -89,4 +90,52 @@ export async function handoffHandler(props: HandoffHandlerProps): Promise<{ stat
 
   logger.forBot().info(`Handoff: conversation ${conversationId} now owned by ${handoffOwner}`)
   return { status: 200, body: JSON.stringify({ conversationId, handoffOwner, handoffResult: handoffResult ?? null }) }
+}
+
+// shortcut: the proof runs on a single tenant; pass the conversation's tenant on the card before production.
+export const DEFAULT_DELEGATION_TENANT = 'TEST'
+// Darwin answers only after confirming the owner on POST /handoff and sending its first message.
+const DELEGATION_TIMEOUT_MS = 20_000
+
+export type RequestDelegationParams = {
+  url: string | undefined
+  apiKey: string | undefined
+  tenant: string | undefined
+  conversationId: string
+  sectionId: string
+  phoneNumber: string | undefined
+  logger: bp.Logger
+}
+
+/**
+ * Asks Darwin whether it takes over the conversation. Never throws: anything other than an
+ * explicit `{ delegated: true }` means "not delegated" and the bot keeps the conversation.
+ */
+export async function requestDelegation(params: RequestDelegationParams): Promise<boolean> {
+  const { url, apiKey, tenant, conversationId, sectionId, phoneNumber, logger } = params
+  try {
+    if (!url || !apiKey) {
+      throw new Error('delegation secrets missing')
+    }
+    if (!phoneNumber) {
+      throw new Error('conversation has no userPhone tag')
+    }
+    const response = await axios.post(
+      url,
+      { conversationId, sectionId, phoneNumber },
+      {
+        headers: {
+          'X-API-KEY': apiKey,
+          'x-execution-tenant': tenant || DEFAULT_DELEGATION_TENANT,
+          'Content-Type': 'application/json',
+        },
+        timeout: DELEGATION_TIMEOUT_MS,
+      }
+    )
+    return response.data?.delegated === true
+  } catch (thrown: unknown) {
+    const errMsg = thrown instanceof Error ? thrown.message : 'Unknown error thrown'
+    logger.forBot().error(`Handoff: conversation ${conversationId} was NOT delegated to Darwin: ${errMsg}`)
+    return false
+  }
 }

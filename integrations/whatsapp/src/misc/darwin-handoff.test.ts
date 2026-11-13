@@ -1,5 +1,6 @@
-import { describe, test, expect, vi } from 'vitest'
-import { handoffHandler, isDelegatedToDarwin, isHandoffReturnMessage } from './darwin-handoff'
+import axios from 'axios'
+import { describe, test, expect, beforeEach, vi } from 'vitest'
+import { handoffHandler, isDelegatedToDarwin, isHandoffReturnMessage, requestDelegation } from './darwin-handoff'
 
 const API_KEY = 'handoff-key'
 const RETURN_BODY = { conversationId: 'conv-1', handoffOwner: 'botpress', handoffResult: 'continue' }
@@ -127,5 +128,87 @@ describe('handoffHandler', () => {
     expect(res.status).toBe(400)
     expect(client.updateConversation).not.toHaveBeenCalled()
     expect(client.createMessage).not.toHaveBeenCalled()
+  })
+})
+
+describe('requestDelegation', () => {
+  const URL = 'https://darwin.example.com/chatbot-bff/conversation/v1/delegations'
+  const post = vi.spyOn(axios, 'post')
+
+  function run(overrides: Record<string, unknown> = {}) {
+    const error = vi.fn()
+    const logger = { forBot: () => ({ error }) }
+    const promise = requestDelegation({
+      url: URL,
+      apiKey: 'bff-key',
+      tenant: undefined,
+      conversationId: 'conv-1',
+      sectionId: 'handoff-proof',
+      phoneNumber: '+5511999999999',
+      logger: logger as never,
+      ...overrides,
+    })
+    return { promise, error }
+  }
+
+  beforeEach(() => {
+    post.mockReset()
+  })
+
+  test('posts the delegation question with the key and the default tenant, returns delegated = true', async () => {
+    post.mockResolvedValueOnce({ data: { delegated: true } })
+
+    const { promise, error } = run()
+
+    await expect(promise).resolves.toBe(true)
+    expect(post).toHaveBeenCalledWith(
+      URL,
+      { conversationId: 'conv-1', sectionId: 'handoff-proof', phoneNumber: '+5511999999999' },
+      {
+        headers: { 'X-API-KEY': 'bff-key', 'x-execution-tenant': 'TEST', 'Content-Type': 'application/json' },
+        timeout: 20_000,
+      }
+    )
+    expect(error).not.toHaveBeenCalled()
+  })
+
+  test('sends the tenant given on the card', async () => {
+    post.mockResolvedValueOnce({ data: { delegated: true } })
+
+    await run({ tenant: 'STAY' }).promise
+
+    expect(post.mock.calls[0]?.[2]?.headers).toMatchObject({ 'x-execution-tenant': 'STAY' })
+  })
+
+  test.each([
+    ['Darwin says no', { data: { delegated: false } }],
+    ['unexpected body', { data: {} }],
+    ['truthy but not true', { data: { delegated: 'true' } }],
+  ])('not delegated: %s', async (_label, response) => {
+    post.mockResolvedValueOnce(response)
+
+    await expect(run().promise).resolves.toBe(false)
+  })
+
+  test('request fails: not delegated, error logged with the conversationId, never throws', async () => {
+    post.mockRejectedValueOnce(new Error('timeout of 20000ms exceeded'))
+
+    const { promise, error } = run()
+
+    await expect(promise).resolves.toBe(false)
+    expect(error.mock.calls[0]?.[0]).toContain('conv-1')
+    expect(error.mock.calls[0]?.[0]).toContain('timeout')
+  })
+
+  test.each([
+    ['url missing', { url: undefined }],
+    ['api key missing', { apiKey: '' }],
+    ['conversation without userPhone', { phoneNumber: undefined }],
+  ])('no request and not delegated: %s', async (_label, overrides) => {
+    const { promise, error } = run(overrides)
+
+    await expect(promise).resolves.toBe(false)
+    expect(post).not.toHaveBeenCalled()
+    expect(error).toHaveBeenCalledTimes(1)
   })
 })

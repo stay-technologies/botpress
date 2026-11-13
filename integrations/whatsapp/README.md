@@ -42,6 +42,7 @@ Permite que o Darwin assuma uma conversa de WhatsApp e a devolva ao bot, sem o u
   - `handoffOwner`: `darwin` ou `botpress`. Ausente equivale a `botpress`. Troca de valor, nunca é apagada.
   - `handoffResult`: `continue`, `error` (reservado) ou `none` (gravado pelo bot depois de consumir a instrução).
 - **Tag de mensagem `handoffReturn`** — `true` na mensagem que a integração injeta na devolução (ver abaixo). Serve para relatórios saberem que não foi o usuário que escreveu.
+- **Action `delegateToDarwin`** (card "Delegate to Darwin") — pergunta ao Darwin se ele assume a conversa e retorna na hora `{ delegated }`. Entradas: `conversationId` (`{{event.conversationId}}`), `sectionId` (na prova, `handoff-proof`) e `tenant` (opcional; vazio vira `TEST`). O telefone sai da tag `userPhone` da conversa. Chama `DARWIN_DELEGATION_URL` com `X-API-KEY` = `CHATBOT_BFF_API_KEY` e o header `x-execution-tenant`. Qualquer falha (secret ausente, conversa sem telefone, erro ou demora de mais de 20 s) devolve `delegated = false` e registra erro; o card nunca lança.
 - **Rota `POST /handoff`** — no webhook da integração (`https://webhook.botpress.cloud/<webhookId>/handoff`). Autenticada pelo header `x-api-key`, comparado com o secret `HANDOFF_API_KEY`. Corpo JSON:
   ```json
   {
@@ -53,7 +54,7 @@ Permite que o Darwin assuma uma conversa de WhatsApp e a devolva ao bot, sem o u
   - Sem `handoffResult`: só grava `handoffOwner`.
   - Com `handoffResult`: grava as duas tags e **depois** injeta na conversa uma mensagem de entrada falsa, em nome do usuário, com o texto fixo `__handoff_returned__`. Se a mensagem falhar, a conversa já voltou.
   - Respostas: `200` ok; `401` chave ausente/inválida (sem efeito); `400` corpo inválido; `405` método diferente de POST; `500` falha ao gravar tag ou injetar a mensagem.
-- **Como o fluxo espera e volta** — no Studio: delegar ao Darwin → card "esperar resposta do usuário" → nó que lê o resultado. Um card comum não segura o fluxo, e um evento não destrava um fluxo parado esperando mensagem; por isso a devolução é uma mensagem de entrada falsa, de texto fixo `__handoff_returned__`. O nó seguinte lê a tag `handoffResult` para saber o que fazer. A mensagem injetada não vai para o WhatsApp nem é repassada ao Darwin; fica no histórico como fala do usuário, marcada com a tag `handoffReturn`.
+- **Como o fluxo espera e volta** — no Studio: card "Delegate to Darwin" → (se `delegated`) card "esperar resposta do usuário" → nó que lê o resultado. Um card comum não segura o fluxo, e um evento não destrava um fluxo parado esperando mensagem; por isso a devolução é uma mensagem de entrada falsa, de texto fixo `__handoff_returned__`. O nó seguinte lê a tag `handoffResult` para saber o que fazer. A mensagem injetada não vai para o WhatsApp nem é repassada ao Darwin; fica no histórico como fala do usuário, marcada com a tag `handoffReturn`.
 - **Desvio** — com `handoffOwner = darwin`, a mensagem recebida é marcada como lida, repassada ao Darwin (sem consultar a flag do Statsig, com uma nova tentativa) e **não** é entregue ao bot. Conversas sem a tag, ou com outro valor, seguem como antes.
 
 **Limites conhecidos (corrida com mensagens da Meta).** A integração lê a tag `handoffOwner` no momento em que cada mensagem chega; nada trava a conversa durante a troca de dono. Sobram duas janelas curtas:
@@ -229,7 +230,9 @@ bp deploy --dryRun --visibility private -y \
   --secrets SANDBOX_VERIFY_TOKEN=placeholder \
   --secrets SANDBOX_ACCESS_TOKEN=placeholder \
   --secrets SANDBOX_PHONE_NUMBER_ID=placeholder \
-  --secrets HANDOFF_API_KEY=placeholder
+  --secrets HANDOFF_API_KEY=placeholder \
+  --secrets DARWIN_DELEGATION_URL=placeholder \
+  --secrets CHATBOT_BFF_API_KEY=placeholder
 ```
 
 Flags importantes:
@@ -258,10 +261,15 @@ bp deploy --visibility private -y \
   --secrets SANDBOX_VERIFY_TOKEN=<valor-real> \
   --secrets SANDBOX_ACCESS_TOKEN=<valor-real> \
   --secrets SANDBOX_PHONE_NUMBER_ID=<valor-real> \
-  --secrets HANDOFF_API_KEY=<valor-real>
+  --secrets HANDOFF_API_KEY=<valor-real> \
+  --secrets DARWIN_DELEGATION_URL=<valor-real> \
+  --secrets CHATBOT_BFF_API_KEY=<valor-real>
 ```
 
-> `HANDOFF_API_KEY` (FOU-1287) é novo na v1.6.0: precisa ser informado no primeiro deploy dessa versão. É a chave que o Darwin envia no header `x-api-key` da rota `POST /handoff`.
+> Secrets novos na v1.6.0 (FOU-1287), a informar no primeiro deploy dessa versão:
+> - `HANDOFF_API_KEY`: chave que o Darwin envia no header `x-api-key` da rota `POST /handoff`.
+> - `DARWIN_DELEGATION_URL`: URL completa da rota de delegação do Darwin (`.../chatbot-bff/conversation/v1/delegations`).
+> - `CHATBOT_BFF_API_KEY`: chave do chatbot-bff do Darwin (`CHATBOT_AUTH_SECRET` do lado dele).
 
 A CLI:
 1. Faz upload do bundle.

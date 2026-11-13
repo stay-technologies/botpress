@@ -410,6 +410,36 @@ export default new IntegrationDefinition({
     },
   },
   actions: {
+    delegateToDarwin: {
+      title: 'Delegate to Darwin',
+      description:
+        'Asks Darwin whether it takes over the conversation (handoff). Returns right away; when delegated, place a "wait for user input" card next — the flow resumes with the "__handoff_returned__" message.',
+      input: {
+        schema: z.object({
+          conversationId: z
+            .string()
+            .title('Conversation ID')
+            .describe('ID of the current conversation ({{event.conversationId}})'),
+          sectionId: z
+            .string()
+            .title('Section ID')
+            .describe('Identifier of the bot section asking for the delegation (e.g. "handoff-proof")'),
+          tenant: z
+            .string()
+            .optional()
+            .title('Tenant')
+            .describe('Darwin tenant of the conversation. Defaults to "TEST" when empty.'),
+        }),
+      },
+      output: {
+        schema: z.object({
+          delegated: z
+            .boolean()
+            .title('Delegated')
+            .describe('Whether Darwin took over the conversation. False on any failure.'),
+        }),
+      },
+    },
     startConversation: {
       ...startConversationProps,
       output: {
@@ -740,6 +770,13 @@ export default new IntegrationDefinition({
     },
     DARWIN_API_KEY: {
       description: 'Shared API key sent as the X-API-KEY header when forwarding inbound messages to Darwin',
+    },
+    DARWIN_DELEGATION_URL: {
+      description:
+        'Full URL of the Darwin delegation route called by the delegateToDarwin action (.../chatbot-bff/conversation/v1/delegations)',
+    },
+    CHATBOT_BFF_API_KEY: {
+      description: 'API key of the Darwin chatbot-bff, sent as the X-API-KEY header by the delegateToDarwin action',
     },
     HANDOFF_API_KEY: {
       description: 'API key Darwin must send as the x-api-key header when calling the POST /handoff route',

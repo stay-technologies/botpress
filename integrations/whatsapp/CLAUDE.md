@@ -19,7 +19,7 @@ exige autorização explícita do dev, para cada deploy.** Autorização anterio
 | Action `startFlow` (WhatsApp Flows) | [`src/actions/start-flow.ts`](src/actions/start-flow.ts) | [README §1](README.md#1-action-startflow--envio-de-whatsapp-flows) |
 | Identidade por **BSUID** | [`src/misc/bsuid-extraction.ts`](src/misc/bsuid-extraction.ts), [`identifier-decision.ts`](src/misc/identifier-decision.ts) | [README §2](README.md#2-suporte-a-bsuid-business-scoped-user-id) |
 | Forwarding p/ **Darwin** (inbound/outbound/status) | [`src/misc/darwin-inbound-forwarding.ts`](src/misc/darwin-inbound-forwarding.ts) | [docs/stay-customizations.md](docs/stay-customizations.md#forwarding-para-o-darwin) |
-| Handoff de conversa com o **Darwin** (rota `POST /handoff`, tags `handoffOwner`/`handoffResult`, devolução por mensagem injetada) | [`src/misc/darwin-handoff.ts`](src/misc/darwin-handoff.ts) | [docs/stay-customizations.md](docs/stay-customizations.md#handoff-de-conversa-com-o-darwin) |
+| Handoff de conversa com o **Darwin** (action `delegateToDarwin`, rota `POST /handoff`, tags `handoffOwner`/`handoffResult`, devolução por mensagem injetada) | [`src/misc/darwin-handoff.ts`](src/misc/darwin-handoff.ts) | [docs/stay-customizations.md](docs/stay-customizations.md#handoff-de-conversa-com-o-darwin) |
 | Feature toggle via **Statsig** | [`src/misc/feature-toggle.ts`](src/misc/feature-toggle.ts), [`statsig.ts`](src/misc/statsig.ts) | [docs/stay-customizations.md](docs/stay-customizations.md#feature-toggle-statsig) |
 
 Arquitetura das customizações Stay: **[docs/stay-customizations.md](docs/stay-customizations.md)**.

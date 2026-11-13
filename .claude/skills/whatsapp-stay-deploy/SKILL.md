@@ -48,7 +48,9 @@ Todos os comandos rodam a partir de `integrations/whatsapp`.
      --secrets STATSIG_API_KEY=placeholder \
      --secrets DARWIN_INBOUND_URL=placeholder \
      --secrets DARWIN_API_KEY=placeholder \
-     --secrets HANDOFF_API_KEY=placeholder
+     --secrets HANDOFF_API_KEY=placeholder \
+     --secrets DARWIN_DELEGATION_URL=placeholder \
+     --secrets CHATBOT_BFF_API_KEY=placeholder
    ```
    Se reclamar de secret faltando, adicione ao comando (a lista canônica é o bloco
    `secrets` de `integration.definition.ts`). Se reclamar de versão existente, volte ao passo 2.
