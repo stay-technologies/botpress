@@ -164,7 +164,7 @@ const defaultBotPhoneNumberId = {
 }
 
 export const INTEGRATION_NAME = 'whatsapp-stay'
-export const INTEGRATION_VERSION = '1.6.0'
+export const INTEGRATION_VERSION = '1.7.0'
 export default new IntegrationDefinition({
   name: INTEGRATION_NAME,
   version: INTEGRATION_VERSION,
@@ -353,6 +353,11 @@ export default new IntegrationDefinition({
             title: 'Delivery Status',
             description: 'Latest WhatsApp delivery status reported via webhook (SENT, DELIVERED, READ, FAILED).',
           },
+          handoffReturn: {
+            title: 'Handoff Return',
+            description:
+              '"true" on the incoming message injected by the integration when Darwin returns a delegated conversation (POST /handoff). It was not typed by the user and never went through WhatsApp.',
+          },
         },
       },
       conversation: {
@@ -369,6 +374,16 @@ export default new IntegrationDefinition({
             title: 'BSUID',
             description:
               "Business-Scoped User ID (Meta), format `{ISO 3166}.{alphanumeric}`. Used as the recipient when 'userPhone' is absent.",
+          },
+          handoffOwner: {
+            title: 'Handoff Owner',
+            description:
+              'Who owns the conversation: "darwin" (inbound messages are diverted to Darwin and never reach the bot) or "botpress". Absent means "botpress". The value changes, the tag is never deleted.',
+          },
+          handoffResult: {
+            title: 'Handoff Result',
+            description:
+              'Instruction left by Darwin when it returns the conversation: "continue", "error" (reserved) or "none" (written by the bot once the instruction is consumed).',
           },
         },
       },
@@ -395,6 +410,36 @@ export default new IntegrationDefinition({
     },
   },
   actions: {
+    delegateToDarwin: {
+      title: 'Delegate to Darwin',
+      description:
+        'Asks Darwin whether it takes over the conversation (handoff). Returns right away; when delegated, place a "wait for user input" card next — the flow resumes with the "__handoff_returned__" message.',
+      input: {
+        schema: z.object({
+          conversationId: z
+            .string()
+            .title('Conversation ID')
+            .describe('ID of the current conversation ({{event.conversationId}})'),
+          sectionId: z
+            .string()
+            .title('Section ID')
+            .describe('Identifier of the bot section asking for the delegation (e.g. "handoff-proof")'),
+          tenant: z
+            .string()
+            .optional()
+            .title('Tenant')
+            .describe('Darwin tenant of the conversation. Defaults to "TEST" when empty.'),
+        }),
+      },
+      output: {
+        schema: z.object({
+          delegated: z
+            .boolean()
+            .title('Delegated')
+            .describe('Whether Darwin took over the conversation. False on any failure.'),
+        }),
+      },
+    },
     startConversation: {
       ...startConversationProps,
       output: {
@@ -725,6 +770,16 @@ export default new IntegrationDefinition({
     },
     DARWIN_API_KEY: {
       description: 'Shared API key sent as the X-API-KEY header when forwarding inbound messages to Darwin',
+    },
+    DARWIN_DELEGATION_URL: {
+      description:
+        'Full URL of the Darwin delegation route called by the delegateToDarwin action (.../chatbot-bff/conversation/v1/delegations)',
+    },
+    CHATBOT_BFF_API_KEY: {
+      description: 'API key of the Darwin chatbot-bff, sent as the X-API-KEY header by the delegateToDarwin action',
+    },
+    HANDOFF_API_KEY: {
+      description: 'API key Darwin must send as the x-api-key header when calling the POST /handoff route',
     },
   },
   entities: {

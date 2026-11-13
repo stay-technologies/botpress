@@ -5,7 +5,9 @@ import axios from 'axios'
 import { INTEGRATION_NAME, INTEGRATION_VERSION } from 'integration.definition'
 import { getAccessToken, getAuthenticatedWhatsappClient } from '../../auth'
 import { extractContactIdentifiers } from '../../misc/bsuid-extraction'
-import { forwardInboundMessage } from '../../misc/darwin-inbound-forwarding'
+import { getDarwinForwardingSecrets } from '../../misc/darwin-forwarding-secrets'
+import { isDelegatedToDarwin } from '../../misc/darwin-handoff'
+import { forwardDelegatedInboundMessage, forwardInboundMessage } from '../../misc/darwin-inbound-forwarding'
 import { buildConversationTags } from '../../misc/identifier-decision'
 import { safeFormatPhoneNumber } from '../../misc/phone-number-to-whatsapp'
 import { WhatsAppMessage, WhatsAppMessageValue } from '../../misc/types'
@@ -89,6 +91,12 @@ export const messagesHandler = async (
     channel: 'channel',
     tags: buildConversationTags({ botPhoneNumberId: value.metadata.phone_number_id, userPhone, bsuid }),
   })
+
+  // Handoff (FOU-1287): a conversation delegated to Darwin is diverted — the bot never sees the message.
+  if (isDelegatedToDarwin(conversation.tags)) {
+    await forwardDelegatedInboundMessage({ ...getDarwinForwardingSecrets(), message, value, contact, logger })
+    return
+  }
 
   const userTags: Record<string, string | undefined> = {
     userId: botpressUserId,

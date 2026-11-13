@@ -99,17 +99,22 @@ async function postEnvelope(
   label: string
 ): Promise<void> {
   try {
-    await axios.post(url, envelope, {
-      headers: {
-        'X-API-KEY': apiKey,
-        'Content-Type': 'application/json',
-      },
-      timeout: POST_TIMEOUT_MS,
-    })
+    await sendEnvelope(url, apiKey, envelope)
   } catch (thrown: unknown) {
     const errMsg = thrown instanceof Error ? thrown.message : 'Unknown error thrown'
     logger.forBot().error(`Failed to forward ${label} to Darwin: ${errMsg}`)
   }
+}
+
+/** Raw POST of a Darwin envelope. Throws on failure — callers decide what to do with it. */
+async function sendEnvelope(url: string, apiKey: string, envelope: DarwinEnvelope): Promise<void> {
+  await axios.post(url, envelope, {
+    headers: {
+      'X-API-KEY': apiKey,
+      'Content-Type': 'application/json',
+    },
+    timeout: POST_TIMEOUT_MS,
+  })
 }
 
 /**
@@ -301,6 +306,45 @@ export async function forwardInboundMessage(params: ForwardInboundMessageParams)
 
   const envelope = buildInboundEnvelope(message, value, contact, logger)
   await postEnvelope(url, apiKey, envelope, logger, 'inbound WhatsApp message')
+}
+
+export type ForwardDelegatedInboundMessageParams = Omit<ForwardInboundMessageParams, 'phone'>
+
+const DELEGATED_FORWARD_ATTEMPTS = 2
+
+/**
+ * Forwarder for a conversation delegated to Darwin (`handoffOwner = darwin`, FOU-1287).
+ * Here Darwin is the ONLY recipient of the message (the bot never sees it), so unlike the
+ * best-effort forwarders it does not consult the Statsig gate and retries once. A message
+ * that still cannot be delivered is logged with its wamid. Never throws.
+ */
+export async function forwardDelegatedInboundMessage(params: ForwardDelegatedInboundMessageParams): Promise<void> {
+  const { url, apiKey, message, value, contact, logger } = params
+
+  if (!url || !apiKey) {
+    logger
+      .forBot()
+      .error(`Delegated inbound WhatsApp message ${message.id} was NOT forwarded to Darwin: forwarding secrets missing`)
+    return
+  }
+
+  let errMsg = 'Unknown error thrown'
+  try {
+    const envelope = buildInboundEnvelope(message, value, contact, logger)
+    for (let attempt = 1; attempt <= DELEGATED_FORWARD_ATTEMPTS; attempt++) {
+      try {
+        await sendEnvelope(url, apiKey, envelope)
+        return
+      } catch (thrown: unknown) {
+        errMsg = thrown instanceof Error ? thrown.message : errMsg
+      }
+    }
+  } catch (thrown: unknown) {
+    errMsg = thrown instanceof Error ? thrown.message : errMsg
+  }
+  logger
+    .forBot()
+    .error(`Delegated inbound WhatsApp message ${message.id} was NOT forwarded to Darwin after retry: ${errMsg}`)
 }
 
 export type ForwardOutboundMessageParams = {

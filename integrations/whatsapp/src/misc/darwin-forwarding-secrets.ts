@@ -24,3 +24,29 @@ export function getDarwinForwardingSecrets(): { url: string | undefined; apiKey:
   }
   return { url, apiKey }
 }
+
+/** Safe accessor for the delegateToDarwin action secrets (FOU-1287). Missing → undefined → not delegated. */
+export function getDelegationSecrets(): { url: string | undefined; apiKey: string | undefined } {
+  let url: string | undefined
+  let apiKey: string | undefined
+  try {
+    url = bp.secrets.DARWIN_DELEGATION_URL
+  } catch {
+    url = undefined
+  }
+  try {
+    apiKey = bp.secrets.CHATBOT_BFF_API_KEY
+  } catch {
+    apiKey = undefined
+  }
+  return { url, apiKey }
+}
+
+/** Safe accessor for the POST /handoff route key (FOU-1287). Missing secret → undefined → route refuses. */
+export function getHandoffApiKey(): string | undefined {
+  try {
+    return bp.secrets.HANDOFF_API_KEY
+  } catch {
+    return undefined
+  }
+}

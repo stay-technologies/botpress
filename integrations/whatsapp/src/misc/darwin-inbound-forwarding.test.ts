@@ -627,3 +627,71 @@ describe('forwardInboundMessage', () => {
     expect(mockedAxiosPost).toHaveBeenCalledTimes(2)
   })
 })
+
+// Handoff (FOU-1287): conversation delegated to Darwin — no gate, one retry, error logged with the wamid.
+describe('forwardDelegatedInboundMessage', () => {
+  const run = async (logger: unknown, overrides: Record<string, unknown> = {}) => {
+    const { forwardDelegatedInboundMessage } = await import('./darwin-inbound-forwarding')
+    await forwardDelegatedInboundMessage({
+      url: URL,
+      apiKey: API_KEY,
+      message: buildTextMessage(),
+      value: buildValue(),
+      contact: buildContact(),
+      logger: logger as never,
+      ...overrides,
+    })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    isInboundForwardingEnabled.mockResolvedValue(false)
+    mockedAxiosPost.mockResolvedValue({ status: 200 } as never)
+  })
+
+  test('forwards without consulting the Statsig gate (even when the gate is OFF)', async () => {
+    const { logger, error } = buildLogger()
+
+    await run(logger)
+
+    expect(isInboundForwardingEnabled).not.toHaveBeenCalled()
+    expect(mockedAxiosPost).toHaveBeenCalledTimes(1)
+    expect(mockedAxiosPost).toHaveBeenCalledWith(
+      URL,
+      buildInboundEnvelope(buildTextMessage(), buildValue(), buildContact(), logger as never),
+      { headers: { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' }, timeout: 3000 }
+    )
+    expect(error).not.toHaveBeenCalled()
+  })
+
+  test('first POST fails, retry succeeds: 2 POSTs and no error logged', async () => {
+    const { logger, error } = buildLogger()
+    mockedAxiosPost.mockRejectedValueOnce(new Error('timeout'))
+
+    await run(logger)
+
+    expect(mockedAxiosPost).toHaveBeenCalledTimes(2)
+    expect(error).not.toHaveBeenCalled()
+  })
+
+  test('failure persists after the retry: exactly 2 POSTs, error logged with the wamid, never throws', async () => {
+    const { logger, error } = buildLogger()
+    mockedAxiosPost.mockRejectedValue(new Error('ECONNREFUSED'))
+
+    await expect(run(logger)).resolves.toBeUndefined()
+
+    expect(mockedAxiosPost).toHaveBeenCalledTimes(2)
+    expect(error).toHaveBeenCalledTimes(1)
+    expect(error.mock.calls[0]?.[0]).toContain('wamid.TEXT')
+    expect(error.mock.calls[0]?.[0]).toContain('ECONNREFUSED')
+  })
+
+  test('forwarding secrets missing: no POST, error logged with the wamid', async () => {
+    const { logger, error } = buildLogger()
+
+    await run(logger, { url: undefined })
+
+    expect(mockedAxiosPost).not.toHaveBeenCalled()
+    expect(error.mock.calls[0]?.[0]).toContain('wamid.TEXT')
+  })
+})

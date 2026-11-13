@@ -1,6 +1,7 @@
 import { RuntimeError } from '@botpress/client'
 import { Reaction } from 'whatsapp-api-js/messages'
 import { getAuthenticatedWhatsappClient } from '../auth'
+import { isHandoffReturnMessage } from '../misc/darwin-handoff'
 import * as bp from '.botpress'
 
 export const startTypingIndicator: bp.IntegrationProps['actions']['startTypingIndicator'] = async ({
@@ -16,6 +17,9 @@ export const startTypingIndicator: bp.IntegrationProps['actions']['startTypingIn
   const { conversationId, messageId } = input
   const { botPhoneNumberId, userPhone } = await _getConversationInfos(client, conversationId)
   const { whatsappMessageId } = await _getMessageInfos(client, messageId)
+  if (!whatsappMessageId) {
+    return {}
+  }
   const indicator = ctx.configuration.messageReadBehavior === 'typing_indicator' ? 'text' : undefined
 
   // No await to avoid blocking
@@ -42,6 +46,9 @@ export const stopTypingIndicator: bp.IntegrationProps['actions']['stopTypingIndi
   const { conversationId, messageId } = input
   const { botPhoneNumberId, userPhone } = await _getConversationInfos(client, conversationId)
   const { whatsappMessageId } = await _getMessageInfos(client, messageId)
+  if (!whatsappMessageId) {
+    return {}
+  }
   await whatsapp.sendMessage(botPhoneNumberId, { phone: userPhone }, new Reaction(whatsappMessageId))
   return {}
 }
@@ -62,6 +69,10 @@ const _getMessageInfos = async (client: bp.Client, messageId: string) => {
     id: messageId,
   })
   const { id: whatsappMessageId } = message.tags
+  // Handoff (FOU-1287): the injected return message has no wamid — skip the indicator instead of failing.
+  if (isHandoffReturnMessage(message.tags)) {
+    return { whatsappMessageId: undefined }
+  }
   if (!whatsappMessageId) {
     throw new RuntimeError('Missing WhatsApp message id in the message tags')
   }

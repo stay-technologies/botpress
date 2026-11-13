@@ -1,3 +1,4 @@
+import { delegateToDarwin } from './delegate-to-darwin'
 import { listTemplates } from './list-templates'
 import { startConversation, sendTemplateMessage } from './start-conversation'
 import { startFlow } from './start-flow'
@@ -9,6 +10,7 @@ export default {
   sendTemplateMessage,
   listTemplates,
   startFlow,
+  delegateToDarwin,
   startTypingIndicator,
   stopTypingIndicator,
 } as const satisfies bp.IntegrationProps['actions']
