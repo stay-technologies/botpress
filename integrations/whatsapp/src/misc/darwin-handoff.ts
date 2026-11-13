@@ -25,11 +25,16 @@ export function isDelegatedToDarwin(tags: Record<string, string | undefined>): b
 /** Fixed text of the fake incoming message injected when Darwin returns the conversation. */
 export const HANDOFF_RETURNED_TEXT = '__handoff_returned__'
 
-const handoffBodySchema = z.object({
-  conversationId: z.string().min(1),
-  handoffOwner: z.enum(['darwin', 'botpress']),
-  handoffResult: z.enum(['continue', 'error']).optional(),
-})
+const handoffBodySchema = z
+  .object({
+    conversationId: z.string().min(1),
+    handoffOwner: z.enum(['darwin', 'botpress']),
+    handoffResult: z.enum(['continue', 'error']).optional(),
+  })
+  // A result is a return: with Darwin as owner it would wake the bot while Darwin still drives.
+  .refine((body) => !body.handoffResult || body.handoffOwner === 'botpress', {
+    message: 'handoffResult requires handoffOwner = botpress',
+  })
 
 function isValidApiKey(received: string | undefined, expected: string | undefined): boolean {
   if (!received || !expected) {

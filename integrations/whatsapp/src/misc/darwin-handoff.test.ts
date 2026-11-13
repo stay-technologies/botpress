@@ -119,6 +119,10 @@ describe('handoffHandler', () => {
   test.each([
     ['unknown owner', { conversationId: 'conv-1', handoffOwner: 'someone' }],
     ['missing conversationId', { handoffOwner: 'darwin' }],
+    [
+      'handoffResult with owner darwin',
+      { conversationId: 'conv-1', handoffOwner: 'darwin', handoffResult: 'continue' },
+    ],
     ['unknown result', { conversationId: 'conv-1', handoffOwner: 'botpress', handoffResult: 'none' }],
   ])('invalid body → 400 and no side effect: %s', async (_label, body) => {
     const { client, run } = setup(body)

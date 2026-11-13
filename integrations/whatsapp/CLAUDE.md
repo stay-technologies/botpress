@@ -50,7 +50,7 @@ Tudo que não estiver listado aqui vem do upstream `botpress/botpress` — evite
 
 ### Convenções
 
-- Não quebrar o contrato do upstream sem necessidade; mudança de contrato (action/event/config) = bump **major**.
+- Não quebrar o contrato do upstream sem necessidade. Versão segue o README: **patch** para correção sem mudança de contrato, **minor** para capacidade nova retrocompatível (action, evento, tag ou secret novos), **major** só para quebra de contrato (remover ou mudar action/event/config existente).
 - Toda customização Stay fica isolada em módulo próprio em `src/misc/` e é plugada nos handlers — não espalhe lógica Stay dentro do código herdado.
 - Forwarding é **best-effort**: nunca lançar para o hot path do bot.
 
