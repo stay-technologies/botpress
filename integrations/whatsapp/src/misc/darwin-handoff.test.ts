@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest'
-import { handoffHandler, isDelegatedToDarwin } from './darwin-handoff'
+import { handoffHandler, isDelegatedToDarwin, isHandoffReturnMessage } from './darwin-handoff'
 
 const API_KEY = 'handoff-key'
 const VALID_AUTH = {
@@ -12,7 +12,14 @@ function setup(body: unknown, auth: { headers: Record<string, string>; apiKey: s
   const calls: string[] = []
   const client = {
     updateConversation: vi.fn(async () => void calls.push('updateConversation')),
-    createEvent: vi.fn(async () => void calls.push('createEvent')),
+    listParticipants: vi.fn(async () => ({
+      participants: [
+        { id: 'bot-user', tags: {} },
+        { id: 'user-1', tags: { userId: '5511999999999' } },
+      ],
+    })),
+    createMessage: vi.fn(async (_args: { payload: Record<string, unknown> }) => void calls.push('createMessage')),
+    createEvent: vi.fn(),
   }
   const logger = { forBot: () => ({ info: vi.fn(), error: vi.fn() }) }
   const req = { method: 'POST', path: '/handoff', query: '', headers, body: JSON.stringify(body) }
@@ -30,46 +37,105 @@ describe('isDelegatedToDarwin', () => {
   })
 })
 
+describe('isHandoffReturnMessage', () => {
+  test('only the injected return message is flagged', () => {
+    expect(isHandoffReturnMessage({ handoffReturn: 'true' })).toBe(true)
+    expect(isHandoffReturnMessage({ id: 'wamid.X' })).toBe(false)
+    expect(isHandoffReturnMessage({})).toBe(false)
+  })
+})
+
 describe('handoffHandler', () => {
-  test('without handoffResult: only writes handoffOwner, no event', async () => {
+  test('without handoffResult: only writes handoffOwner, no message', async () => {
     const { client, run } = setup({ conversationId: 'conv-1', handoffOwner: 'darwin' })
 
     const res = await run()
 
     expect(res.status).toBe(200)
     expect(client.updateConversation).toHaveBeenCalledWith({ id: 'conv-1', tags: { handoffOwner: 'darwin' } })
-    expect(client.createEvent).not.toHaveBeenCalled()
+    expect(client.createMessage).not.toHaveBeenCalled()
   })
 
-  test('with handoffResult: writes both tags FIRST, then creates handoffReturned', async () => {
+  test('return with returnMessage: writes both tags FIRST, then injects an incoming user message', async () => {
     const { client, calls, run } = setup({
       conversationId: 'conv-1',
       handoffOwner: 'botpress',
       handoffResult: 'continue',
+      returnMessage: { text: 'Continuar', value: 'handoff_continue' },
     })
 
     const res = await run()
 
     expect(res.status).toBe(200)
-    expect(calls).toEqual(['updateConversation', 'createEvent'])
+    expect(calls).toEqual(['updateConversation', 'createMessage'])
     expect(client.updateConversation).toHaveBeenCalledWith({
       id: 'conv-1',
       tags: { handoffOwner: 'botpress', handoffResult: 'continue' },
     })
-    expect(client.createEvent).toHaveBeenCalledWith({
-      type: 'handoffReturned',
+    expect(client.listParticipants).toHaveBeenCalledWith({ id: 'conv-1' })
+    expect(client.createMessage).toHaveBeenCalledWith({
       conversationId: 'conv-1',
-      payload: { handoffResult: 'continue' },
+      userId: 'user-1',
+      type: 'text',
+      payload: { text: 'Continuar', value: 'handoff_continue' },
+      tags: { handoffReturn: 'true' },
     })
+    // a plain incoming message: never synthetic, and no event is created anymore
+    expect(client.createMessage.mock.calls[0]?.[0]).not.toHaveProperty('origin')
+    expect(client.createEvent).not.toHaveBeenCalled()
   })
 
-  test('event creation fails: tags were already written (conversation is back)', async () => {
+  test('return without returnMessage: only writes the tags', async () => {
     const { client, run } = setup({ conversationId: 'conv-1', handoffOwner: 'botpress', handoffResult: 'continue' })
-    client.createEvent.mockRejectedValueOnce(new Error('boom'))
+
+    const res = await run()
+
+    expect(res.status).toBe(200)
+    expect(client.updateConversation).toHaveBeenCalledTimes(1)
+    expect(client.createMessage).not.toHaveBeenCalled()
+  })
+
+  test('returnMessage without value: payload carries only the text', async () => {
+    const { client, run } = setup({
+      conversationId: 'conv-1',
+      handoffOwner: 'botpress',
+      handoffResult: 'continue',
+      returnMessage: { text: 'Continuar' },
+    })
+
+    await run()
+
+    expect(client.createMessage.mock.calls[0]?.[0]).toMatchObject({ payload: { text: 'Continuar' } })
+    expect(client.createMessage.mock.calls[0]?.[0].payload).not.toHaveProperty('value')
+  })
+
+  test('message injection fails: tags were already written (conversation is back)', async () => {
+    const { client, run } = setup({
+      conversationId: 'conv-1',
+      handoffOwner: 'botpress',
+      handoffResult: 'continue',
+      returnMessage: { text: 'Continuar' },
+    })
+    client.createMessage.mockRejectedValueOnce(new Error('boom'))
 
     await expect(run()).rejects.toThrow('boom')
 
     expect(client.updateConversation).toHaveBeenCalledTimes(1)
+  })
+
+  test('no WhatsApp user among the participants: fails after the tags, no message', async () => {
+    const { client, run } = setup({
+      conversationId: 'conv-1',
+      handoffOwner: 'botpress',
+      handoffResult: 'continue',
+      returnMessage: { text: 'Continuar' },
+    })
+    client.listParticipants.mockResolvedValueOnce({ participants: [{ id: 'bot-user', tags: {} }] } as never)
+
+    await expect(run()).rejects.toThrow('no WhatsApp user')
+
+    expect(client.updateConversation).toHaveBeenCalledTimes(1)
+    expect(client.createMessage).not.toHaveBeenCalled()
   })
 
   test.each([
@@ -84,13 +150,21 @@ describe('handoffHandler', () => {
 
     expect(res.status).toBe(401)
     expect(client.updateConversation).not.toHaveBeenCalled()
-    expect(client.createEvent).not.toHaveBeenCalled()
+    expect(client.createMessage).not.toHaveBeenCalled()
   })
 
   test.each([
     ['unknown owner', { conversationId: 'conv-1', handoffOwner: 'someone' }],
     ['missing conversationId', { handoffOwner: 'darwin' }],
     ['unknown result', { conversationId: 'conv-1', handoffOwner: 'botpress', handoffResult: 'none' }],
+    [
+      'returnMessage without handoffResult',
+      { conversationId: 'conv-1', handoffOwner: 'darwin', returnMessage: { text: 'x' } },
+    ],
+    [
+      'returnMessage with empty text',
+      { conversationId: 'conv-1', handoffOwner: 'botpress', handoffResult: 'continue', returnMessage: { text: '' } },
+    ],
   ])('invalid body → 400 and no side effect: %s', async (_label, body) => {
     const { client, run } = setup(body)
 
@@ -98,6 +172,6 @@ describe('handoffHandler', () => {
 
     expect(res.status).toBe(400)
     expect(client.updateConversation).not.toHaveBeenCalled()
-    expect(client.createEvent).not.toHaveBeenCalled()
+    expect(client.createMessage).not.toHaveBeenCalled()
   })
 })

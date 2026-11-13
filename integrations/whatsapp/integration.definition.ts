@@ -353,6 +353,11 @@ export default new IntegrationDefinition({
             title: 'Delivery Status',
             description: 'Latest WhatsApp delivery status reported via webhook (SENT, DELIVERED, READ, FAILED).',
           },
+          handoffReturn: {
+            title: 'Handoff Return',
+            description:
+              '"true" on the incoming message injected by the integration when Darwin returns a delegated conversation (POST /handoff). It was not typed by the user and never went through WhatsApp.',
+          },
         },
       },
       conversation: {
@@ -671,17 +676,6 @@ export default new IntegrationDefinition({
       description:
         'Triggered when the category of a WhatsApp template is changed — whether manually or by an automated process, or when such a change is about to occur.',
       schema: WhatsAppTemplateCategoryUpdateValueSchema,
-    },
-    handoffReturned: {
-      title: 'Handoff Returned',
-      description:
-        'Triggered when Darwin returns a delegated conversation to the bot (POST /handoff with a handoffResult)',
-      schema: z.object({
-        handoffResult: z
-          .enum(['continue', 'error'])
-          .title('Handoff Result')
-          .describe('What the bot should do with the returned conversation ("error" is reserved)'),
-      }),
     },
   },
   states: {
