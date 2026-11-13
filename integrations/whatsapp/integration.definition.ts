@@ -164,7 +164,7 @@ const defaultBotPhoneNumberId = {
 }
 
 export const INTEGRATION_NAME = 'whatsapp-stay'
-export const INTEGRATION_VERSION = '1.6.0'
+export const INTEGRATION_VERSION = '1.7.0'
 export default new IntegrationDefinition({
   name: INTEGRATION_NAME,
   version: INTEGRATION_VERSION,

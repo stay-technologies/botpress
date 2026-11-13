@@ -266,7 +266,7 @@ bp deploy --visibility private -y \
   --secrets CHATBOT_BFF_API_KEY=<valor-real>
 ```
 
-> Secrets novos na v1.6.0 (FOU-1287), a informar no primeiro deploy dessa versão:
+> Secrets novos na v1.7.0 (FOU-1287), a informar no primeiro deploy dessa versão:
 > - `HANDOFF_API_KEY`: chave que o Darwin envia no header `x-api-key` da rota `POST /handoff`.
 > - `DARWIN_DELEGATION_URL`: URL completa da rota de delegação do Darwin (`.../chatbot-bff/conversation/v1/delegations`).
 > - `CHATBOT_BFF_API_KEY`: chave do chatbot-bff do Darwin (`CHATBOT_AUTH_SECRET` do lado dele).
