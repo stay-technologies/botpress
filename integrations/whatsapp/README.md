@@ -56,6 +56,13 @@ Permite que o Darwin assuma uma conversa de WhatsApp e a devolva ao bot, sem o u
 - **Como o fluxo espera e volta** — no Studio: delegar ao Darwin → card "esperar resposta do usuário" → nó que lê o resultado. Um card comum não segura o fluxo, e um evento não destrava um fluxo parado esperando mensagem; por isso a devolução é uma mensagem de entrada falsa, de texto fixo `__handoff_returned__`. O nó seguinte lê a tag `handoffResult` para saber o que fazer. A mensagem injetada não vai para o WhatsApp nem é repassada ao Darwin; fica no histórico como fala do usuário, marcada com a tag `handoffReturn`.
 - **Desvio** — com `handoffOwner = darwin`, a mensagem recebida é marcada como lida, repassada ao Darwin (sem consultar a flag do Statsig, com uma nova tentativa) e **não** é entregue ao bot. Conversas sem a tag, ou com outro valor, seguem como antes.
 
+**Limites conhecidos (corrida com mensagens da Meta).** A integração lê a tag `handoffOwner` no momento em que cada mensagem chega; nada trava a conversa durante a troca de dono. Sobram duas janelas curtas:
+
+- **Na ida** — mensagem do usuário que chega antes de o Darwin gravar `handoffOwner = darwin` vai para o bot e destrava o card de espera cedo demais, com o Darwin ainda no controle.
+- **Na volta** — mensagem real que chega logo depois da troca da tag e antes da mensagem falsa faz o bot receber as duas: a real destrava o card e a `__handoff_returned__` chega em seguida, como se fosse resposta do usuário ao nó seguinte. Já uma mensagem lida um instante antes da troca da tag é repassada ao Darwin, que já devolveu a conversa.
+
+Status de entrega (entregue, lido) não entram nisso: viram eventos, não mensagens. Mitigação no Studio: o nó depois da espera confere a tag e o texto — se `handoffOwner` ainda é `darwin`, ou se o texto não é `__handoff_returned__`, volta a esperar. Aceitável para a prova (telefones do time); precisa de tratamento antes de produção.
+
 Do lado do Darwin: `WHATSAPP_STAY_HANDOFF_URL` aponta para a rota e `WHATSAPP_STAY_HANDOFF_API_KEY` carrega o mesmo valor de `HANDOFF_API_KEY`.
 
 ---
