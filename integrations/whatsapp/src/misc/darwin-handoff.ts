@@ -21,17 +21,14 @@ export function isDelegatedToDarwin(tags: Record<string, string | undefined>): b
   return tags.handoffOwner === 'darwin'
 }
 
-const handoffBodySchema = z
-  .object({
-    conversationId: z.string().min(1),
-    handoffOwner: z.enum(['darwin', 'botpress']),
-    handoffResult: z.enum(['continue', 'error']).optional(),
-    // Button-reply shaped message the bot asked for when delegating; Darwin stores it and sends it back.
-    returnMessage: z.object({ text: z.string().min(1), value: z.string().optional() }).optional(),
-  })
-  .refine((body) => !body.returnMessage || body.handoffResult, {
-    message: 'returnMessage requires handoffResult',
-  })
+/** Fixed text of the fake incoming message injected when Darwin returns the conversation. */
+export const HANDOFF_RETURNED_TEXT = '__handoff_returned__'
+
+const handoffBodySchema = z.object({
+  conversationId: z.string().min(1),
+  handoffOwner: z.enum(['darwin', 'botpress']),
+  handoffResult: z.enum(['continue', 'error']).optional(),
+})
 
 function isValidApiKey(received: string | undefined, expected: string | undefined): boolean {
   if (!received || !expected) {
@@ -66,15 +63,15 @@ export async function handoffHandler(props: HandoffHandlerProps): Promise<{ stat
     const errMsg = thrown instanceof Error ? thrown.message : 'Unknown error thrown'
     return { status: 400, body: `Invalid handoff body: ${errMsg}` }
   }
-  const { conversationId, handoffOwner, handoffResult, returnMessage } = body
+  const { conversationId, handoffOwner, handoffResult } = body
 
   // Tags first, message second: if the message fails the conversation has already been returned.
   await client.updateConversation({
     id: conversationId,
     tags: { handoffOwner, ...(handoffResult && { handoffResult }) },
   })
-  if (returnMessage) {
-    // A plain incoming message, as if the user had answered: it is what wakes a flow parked on
+  if (handoffResult) {
+    // A fake incoming message, as if the user had answered: it is what wakes a flow parked on
     // "wait for user input". It never goes to WhatsApp nor to Darwin.
     const { participants } = await client.listParticipants({ id: conversationId })
     const user = participants.find((participant) => participant.tags.userId)
@@ -85,7 +82,7 @@ export async function handoffHandler(props: HandoffHandlerProps): Promise<{ stat
       conversationId,
       userId: user.id,
       type: 'text',
-      payload: { text: returnMessage.text, ...(returnMessage.value !== undefined && { value: returnMessage.value }) },
+      payload: { text: HANDOFF_RETURNED_TEXT },
       tags: { handoffReturn: 'true' },
     })
   }

@@ -2,6 +2,7 @@ import { describe, test, expect, vi } from 'vitest'
 import { handoffHandler, isDelegatedToDarwin, isHandoffReturnMessage } from './darwin-handoff'
 
 const API_KEY = 'handoff-key'
+const RETURN_BODY = { conversationId: 'conv-1', handoffOwner: 'botpress', handoffResult: 'continue' }
 const VALID_AUTH = {
   headers: { 'x-api-key': API_KEY } as Record<string, string>,
   apiKey: API_KEY as string | undefined,
@@ -56,13 +57,8 @@ describe('handoffHandler', () => {
     expect(client.createMessage).not.toHaveBeenCalled()
   })
 
-  test('return with returnMessage: writes both tags FIRST, then injects an incoming user message', async () => {
-    const { client, calls, run } = setup({
-      conversationId: 'conv-1',
-      handoffOwner: 'botpress',
-      handoffResult: 'continue',
-      returnMessage: { text: 'Continuar', value: 'handoff_continue' },
-    })
+  test('with handoffResult: writes both tags FIRST, then injects the fixed fake incoming message', async () => {
+    const { client, calls, run } = setup(RETURN_BODY)
 
     const res = await run()
 
@@ -77,7 +73,7 @@ describe('handoffHandler', () => {
       conversationId: 'conv-1',
       userId: 'user-1',
       type: 'text',
-      payload: { text: 'Continuar', value: 'handoff_continue' },
+      payload: { text: '__handoff_returned__' },
       tags: { handoffReturn: 'true' },
     })
     // a plain incoming message: never synthetic, and no event is created anymore
@@ -85,37 +81,8 @@ describe('handoffHandler', () => {
     expect(client.createEvent).not.toHaveBeenCalled()
   })
 
-  test('return without returnMessage: only writes the tags', async () => {
-    const { client, run } = setup({ conversationId: 'conv-1', handoffOwner: 'botpress', handoffResult: 'continue' })
-
-    const res = await run()
-
-    expect(res.status).toBe(200)
-    expect(client.updateConversation).toHaveBeenCalledTimes(1)
-    expect(client.createMessage).not.toHaveBeenCalled()
-  })
-
-  test('returnMessage without value: payload carries only the text', async () => {
-    const { client, run } = setup({
-      conversationId: 'conv-1',
-      handoffOwner: 'botpress',
-      handoffResult: 'continue',
-      returnMessage: { text: 'Continuar' },
-    })
-
-    await run()
-
-    expect(client.createMessage.mock.calls[0]?.[0]).toMatchObject({ payload: { text: 'Continuar' } })
-    expect(client.createMessage.mock.calls[0]?.[0].payload).not.toHaveProperty('value')
-  })
-
   test('message injection fails: tags were already written (conversation is back)', async () => {
-    const { client, run } = setup({
-      conversationId: 'conv-1',
-      handoffOwner: 'botpress',
-      handoffResult: 'continue',
-      returnMessage: { text: 'Continuar' },
-    })
+    const { client, run } = setup(RETURN_BODY)
     client.createMessage.mockRejectedValueOnce(new Error('boom'))
 
     await expect(run()).rejects.toThrow('boom')
@@ -124,12 +91,7 @@ describe('handoffHandler', () => {
   })
 
   test('no WhatsApp user among the participants: fails after the tags, no message', async () => {
-    const { client, run } = setup({
-      conversationId: 'conv-1',
-      handoffOwner: 'botpress',
-      handoffResult: 'continue',
-      returnMessage: { text: 'Continuar' },
-    })
+    const { client, run } = setup(RETURN_BODY)
     client.listParticipants.mockResolvedValueOnce({ participants: [{ id: 'bot-user', tags: {} }] } as never)
 
     await expect(run()).rejects.toThrow('no WhatsApp user')
@@ -157,14 +119,6 @@ describe('handoffHandler', () => {
     ['unknown owner', { conversationId: 'conv-1', handoffOwner: 'someone' }],
     ['missing conversationId', { handoffOwner: 'darwin' }],
     ['unknown result', { conversationId: 'conv-1', handoffOwner: 'botpress', handoffResult: 'none' }],
-    [
-      'returnMessage without handoffResult',
-      { conversationId: 'conv-1', handoffOwner: 'darwin', returnMessage: { text: 'x' } },
-    ],
-    [
-      'returnMessage with empty text',
-      { conversationId: 'conv-1', handoffOwner: 'botpress', handoffResult: 'continue', returnMessage: { text: '' } },
-    ],
   ])('invalid body → 400 and no side effect: %s', async (_label, body) => {
     const { client, run } = setup(body)
 

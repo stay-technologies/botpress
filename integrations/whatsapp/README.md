@@ -47,15 +47,13 @@ Permite que o Darwin assuma uma conversa de WhatsApp e a devolva ao bot, sem o u
   {
     "conversationId": "<id da conversa no Botpress>",
     "handoffOwner": "darwin | botpress",
-    "handoffResult": "continue | error (opcional)",
-    "returnMessage": { "text": "Continuar", "value": "handoff_continue (opcional)" }
+    "handoffResult": "continue | error (opcional)"
   }
   ```
   - Sem `handoffResult`: só grava `handoffOwner`.
-  - Com `handoffResult`: grava as duas tags.
-  - Com `returnMessage` (opcional, exige `handoffResult`): **depois** das tags, injeta na conversa uma mensagem de entrada de texto, em nome do usuário, com `text` e `value` (mesmo formato de uma resposta de botão). Se a mensagem falhar, a conversa já voltou.
+  - Com `handoffResult`: grava as duas tags e **depois** injeta na conversa uma mensagem de entrada falsa, em nome do usuário, com o texto fixo `__handoff_returned__`. Se a mensagem falhar, a conversa já voltou.
   - Respostas: `200` ok; `401` chave ausente/inválida (sem efeito); `400` corpo inválido; `405` método diferente de POST; `500` falha ao gravar tag ou injetar a mensagem.
-- **Como o fluxo espera e volta** — no Studio: delegar ao Darwin → card "esperar resposta do usuário" → nó que lê o resultado. Um card comum não segura o fluxo, e um evento não destrava um fluxo parado esperando mensagem; por isso a devolução é uma mensagem de entrada. O conteúdo de `returnMessage` é definido pelo nó do Botpress ao delegar; o Darwin guarda e reenvia na devolução, a integração não guarda nada. A mensagem injetada não vai para o WhatsApp nem é repassada ao Darwin; fica no histórico como fala do usuário, marcada com a tag `handoffReturn`.
+- **Como o fluxo espera e volta** — no Studio: delegar ao Darwin → card "esperar resposta do usuário" → nó que lê o resultado. Um card comum não segura o fluxo, e um evento não destrava um fluxo parado esperando mensagem; por isso a devolução é uma mensagem de entrada falsa, de texto fixo `__handoff_returned__`. O nó seguinte lê a tag `handoffResult` para saber o que fazer. A mensagem injetada não vai para o WhatsApp nem é repassada ao Darwin; fica no histórico como fala do usuário, marcada com a tag `handoffReturn`.
 - **Desvio** — com `handoffOwner = darwin`, a mensagem recebida é marcada como lida, repassada ao Darwin (sem consultar a flag do Statsig, com uma nova tentativa) e **não** é entregue ao bot. Conversas sem a tag, ou com outro valor, seguem como antes.
 
 Do lado do Darwin: `WHATSAPP_STAY_HANDOFF_URL` aponta para a rota e `WHATSAPP_STAY_HANDOFF_API_KEY` carrega o mesmo valor de `HANDOFF_API_KEY`.
