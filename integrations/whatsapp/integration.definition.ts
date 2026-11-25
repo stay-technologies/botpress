@@ -164,7 +164,7 @@ const defaultBotPhoneNumberId = {
 }
 
 export const INTEGRATION_NAME = 'whatsapp-stay'
-export const INTEGRATION_VERSION = '1.7.0'
+export const INTEGRATION_VERSION = '1.8.0'
 export default new IntegrationDefinition({
   name: INTEGRATION_NAME,
   version: INTEGRATION_VERSION,
@@ -780,6 +780,16 @@ export default new IntegrationDefinition({
     },
     HANDOFF_API_KEY: {
       description: 'API key Darwin must send as the x-api-key header when calling the POST /handoff route',
+    },
+    FINDESA_STATUS_URL: {
+      description:
+        'Full URL of the findesa route that receives the WhatsApp delivery statuses (.../api/meta-statuses). Optional: when missing, statuses are not forwarded to findesa',
+      optional: true,
+    },
+    FINDESA_STATUS_TOKEN: {
+      description:
+        'Token sent as the x-daily-messages-token header when forwarding delivery statuses to findesa. Optional: when missing, statuses are not forwarded to findesa',
+      optional: true,
     },
   },
   entities: {

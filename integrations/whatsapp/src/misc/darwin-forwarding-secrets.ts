@@ -50,3 +50,20 @@ export function getHandoffApiKey(): string | undefined {
     return undefined
   }
 }
+
+/** Safe accessor for the findesa status forwarding secrets (NOV-1010). Missing → undefined → not forwarded. */
+export function getFindesaForwardingSecrets(): { url: string | undefined; token: string | undefined } {
+  let url: string | undefined
+  let token: string | undefined
+  try {
+    url = bp.secrets.FINDESA_STATUS_URL
+  } catch {
+    url = undefined
+  }
+  try {
+    token = bp.secrets.FINDESA_STATUS_TOKEN
+  } catch {
+    token = undefined
+  }
+  return { url, token }
+}

@@ -194,6 +194,9 @@ const WhatsAppStatusSchema = z.object({
       })
     )
     .optional(),
+  // Kept as received (only `pricing.category` is read, by the findesa forwarding). Left
+  // loose on purpose: a stricter schema would reject the whole webhook on any shape change.
+  pricing: z.unknown().optional(),
 })
 
 export type WhatsAppStatusValue = z.infer<typeof WhatsAppStatusSchema>

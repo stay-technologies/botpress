@@ -1,8 +1,9 @@
 import { Request } from '@botpress/sdk'
 import * as crypto from 'crypto'
 import { getClientSecret } from '../auth'
-import { getHandoffApiKey } from '../misc/darwin-forwarding-secrets'
+import { getFindesaForwardingSecrets, getHandoffApiKey } from '../misc/darwin-forwarding-secrets'
 import { handoffHandler, HANDOFF_PATH } from '../misc/darwin-handoff'
+import { forwardStatusesToFindesa } from '../misc/findesa-status-forwarding'
 import { WhatsAppPayload, WhatsAppPayloadSchema } from '../misc/types'
 import { echoHandler } from './handlers/echo'
 import { messagesHandler } from './handlers/messages'
@@ -73,23 +74,35 @@ const _handler: bp.IntegrationProps['handler'] = async (props: bp.HandlerProps) 
         }
       }
       break
-    case 'messages':
-      for (const message of changes.value.messages ?? []) {
-        if (message.type === 'reaction') {
-          await reactionHandler(message, props)
-        } else {
-          await messagesHandler(message, changes.value, props)
+    case 'messages': {
+      // Runs alongside the bot's own handling so it adds as little as possible to the time
+      // Meta waits for the answer. It never rejects; it is awaited before the handler returns.
+      const findesaForwarding = forwardStatusesToFindesa({
+        ...getFindesaForwardingSecrets(),
+        statuses: changes.value.statuses,
+        logger,
+      })
+      try {
+        for (const message of changes.value.messages ?? []) {
+          if (message.type === 'reaction') {
+            await reactionHandler(message, props)
+          } else {
+            await messagesHandler(message, changes.value, props)
+          }
         }
-      }
-      for (const status of changes.value.statuses ?? []) {
-        try {
-          await statusHandler(status, changes.value, props)
-        } catch (thrown: unknown) {
-          const errMsg = thrown instanceof Error ? thrown.message : 'Unknown error thrown'
-          logger.forBot().error(`Failed to process WhatsApp status event: ${errMsg}`)
+        for (const status of changes.value.statuses ?? []) {
+          try {
+            await statusHandler(status, changes.value, props)
+          } catch (thrown: unknown) {
+            const errMsg = thrown instanceof Error ? thrown.message : 'Unknown error thrown'
+            logger.forBot().error(`Failed to process WhatsApp status event: ${errMsg}`)
+          }
         }
+      } finally {
+        await findesaForwarding
       }
       break
+    }
     case 'message_template_components_update':
       await client.createEvent({
         type: 'messageTemplateComponentsUpdate',

@@ -11,6 +11,7 @@ Doc de referência do [CLAUDE.md](../CLAUDE.md) — features de produto (Flows, 
 | Identidade por BSUID | [`src/misc/bsuid-extraction.ts`](../src/misc/bsuid-extraction.ts), [`src/misc/identifier-decision.ts`](../src/misc/identifier-decision.ts) | FOU-320/328/339 |
 | Forwarding p/ Darwin | [`src/misc/darwin-inbound-forwarding.ts`](../src/misc/darwin-inbound-forwarding.ts) | FOU-541/530 |
 | Handoff de conversa com o Darwin | [`src/misc/darwin-handoff.ts`](../src/misc/darwin-handoff.ts) | FOU-1287 |
+| Repasse de status ao findesa | [`src/misc/findesa-status-forwarding.ts`](../src/misc/findesa-status-forwarding.ts) | NOV-1010 |
 | Feature toggle (Statsig) | [`src/misc/feature-toggle.ts`](../src/misc/feature-toggle.ts), [`src/misc/statsig.ts`](../src/misc/statsig.ts) | FOU-550 |
 
 ## Forwarding para o Darwin
@@ -32,6 +33,19 @@ Regras invioláveis do encaminhamento (ao mexer, **preserve**):
 - **Motivo da falha de entrega** — o status `failed` leva o `errors[]` da Meta só com `code` e `title` por item. O Darwin responde 400 ao envelope inteiro se um item tiver outro campo, e o status se perde junto.
 
 Secrets usados: `DARWIN_INBOUND_URL`, `DARWIN_API_KEY` (ver bloco `secrets` em [`integration.definition.ts`](../integration.definition.ts)).
+
+## Repasse de status ao findesa
+
+O findesa envia lembretes por este número e recebe daqui os status de entrega (NOV-1010). Contrato no [README §4](../README.md#4-repasse-dos-status-de-entrega-ao-findesa-nov-1010).
+
+- **Ponto de entrada** — `forwardStatusesToFindesa`, chamado em [`src/webhook/handler.ts`](../src/webhook/handler.ts) no `case 'messages'`: um `POST` por webhook com todos os `statuses[]` (em blocos de até 100). Corre em paralelo com o tratamento do bot e é aguardado antes de o handler devolver a resposta à Meta.
+- **Sem a flag do Statsig.** A integração não sabe quais mensagens são do findesa; todos os status vão, de qualquer telefone. Não reaproveite `isInboundForwardingEnabled` aqui.
+- **Sem telefone e sem texto.** `buildFindesaStatuses` leva só id da mensagem, status, horário, categoria e o `code` dos erros. O log de falha não traz o id da mensagem (o `wamid` codifica o telefone), nem a mensagem de erro do axios (pode trazer a URL).
+- **`pricing` fica solto no schema** (`z.unknown()` em [`types.ts`](../src/misc/types.ts)): um schema exigente recusaria o webhook inteiro se a Meta mudasse o formato. A categoria é lida com cuidado em `pricingCategory`.
+- **Nova tentativa** — uma, imediata, só sem resposta ou com 5xx (`MAX_ATTEMPTS = 2`, `POST_TIMEOUT_MS = 3000`). O handler só responde à Meta depois que o repasse termina, então não há como esperar entre as tentativas; o findesa aceita o mesmo status repetido.
+- **Best-effort** — nunca lança nem rejeita.
+
+Secrets usados (opcionais): `FINDESA_STATUS_URL`, `FINDESA_STATUS_TOKEN`, lidos por `getFindesaForwardingSecrets` em [`darwin-forwarding-secrets.ts`](../src/misc/darwin-forwarding-secrets.ts).
 
 ## Handoff de conversa com o Darwin
 

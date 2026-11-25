@@ -67,6 +67,23 @@ Status de entrega (entregue, lido) não entram nisso: viram eventos, não mensag
 
 Do lado do Darwin: `WHATSAPP_STAY_HANDOFF_URL` aponta para a rota e `WHATSAPP_STAY_HANDOFF_API_KEY` carrega o mesmo valor de `HANDOFF_API_KEY`.
 
+### 4. Repasse dos status de entrega ao findesa (NOV-1010)
+
+O findesa envia seus lembretes por este mesmo número e precisa saber se cada um foi entregue, lido ou falhou, e em que categoria a Meta cobrou. A cada webhook da Meta com `statuses[]`, a integração manda **todos** os status ao findesa (ela não sabe quais mensagens são dele), num único `POST` para `FINDESA_STATUS_URL`, com o header `x-daily-messages-token` = `FINDESA_STATUS_TOKEN`:
+
+```json
+[
+  { "meta_message_id": "wamid.HBgN...", "status": "delivered", "timestamp": "1795646400", "category": "utility" },
+  { "meta_message_id": "wamid.HBgN...", "status": "failed", "timestamp": "1795646460", "category": null, "errors": [{ "code": 131026 }] }
+]
+```
+
+- `category` vem de `statuses[].pricing.category`; quando o status não traz `pricing`, vai `null`.
+- **Não saem daqui** telefone (`recipient_id`), BSUID, texto de mensagem nem título ou mensagem de erro: do erro vai só o `code`.
+- O repasse **não** passa pela flag do Statsig do Darwin e não altera o repasse ao Darwin.
+- Sem resposta ou com 5xx, a integração tenta mais uma vez, na hora (cada tentativa espera até 3 s). Com 400 ou 401 não tenta de novo. Em qualquer falha só registra erro, sem o id da mensagem. Não há espera entre as tentativas: se o findesa estiver dormindo, os status daquele webhook se perdem.
+- Os dois secrets são opcionais: sem eles, nada é repassado.
+
 ---
 
 # Deploy de uma nova versão
@@ -264,8 +281,14 @@ bp deploy --visibility private -y \
   --secrets SANDBOX_PHONE_NUMBER_ID=<valor-real> \
   --secrets HANDOFF_API_KEY=<valor-real> \
   --secrets DARWIN_DELEGATION_URL=<valor-real> \
-  --secrets CHATBOT_BFF_API_KEY=<valor-real>
+  --secrets CHATBOT_BFF_API_KEY=<valor-real> \
+  --secrets FINDESA_STATUS_URL=<valor-real> \
+  --secrets FINDESA_STATUS_TOKEN=<valor-real>
 ```
+
+> Secrets novos na v1.8.0 (NOV-1010), opcionais (sem eles o repasse ao findesa fica desligado; o dry run não os exige):
+> - `FINDESA_STATUS_URL`: URL completa da rota de status do findesa (`.../api/meta-statuses`).
+> - `FINDESA_STATUS_TOKEN`: o `DAILY_MESSAGES_TOKEN` do findesa.
 
 > Secrets novos na v1.7.0 (FOU-1287), a informar no primeiro deploy dessa versão:
 > - `HANDOFF_API_KEY`: chave que o Darwin envia no header `x-api-key` da rota `POST /handoff`.
